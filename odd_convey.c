@@ -43,20 +43,25 @@ int main() {
   loff_t last_read = 0;
   loff_t last_seen = 0;
 
+  close(STDIN_FILENO);
+
   int ifd = open(input_name, O_RDONLY, 0);
   if (ifd < 0) {
     fprintf(stderr, "Failed to open file (input) %s: %s\n", input_name, strerror(errno));
+    fflush(stderr);
     return -1;
   }
   int ofd = open(output_name, O_WRONLY, 0);
   if (ofd < 0) {
     fprintf(stderr, "Failed to open file (output) %s: %s\n", output_name, strerror(errno));
+    fflush(stderr);
     return -1;
   }
 
   void* buffer = malloc(slice);
   if (!buffer) {
     fprintf(stderr, "No memory to allocate\n");
+    fflush(stderr);
     return -1;
   }
   fprintf(stdout, "Initialized memory convey from %s to %s,"
