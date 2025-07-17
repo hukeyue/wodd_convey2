@@ -43,6 +43,7 @@ freely, subject to the following restrictions:
 #define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
 #endif
 #endif
+#include <unistd.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -126,13 +127,6 @@ int main() {
       fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / size);
       last_seen = last_read;
     }
-  }
-
-  if (fdatasync(ofd) < 0) {
-    fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
-    fflush(stderr);
-    _exit(-1); // FIXME cleaner cleanup at exit
-    return -1;
   }
 
   free(buffer);
