@@ -1,3 +1,6 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif // _GNU_SOURCE
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +13,14 @@ void usage(exec_name)
   fprintf(stderr, "%s Usage: access <file path>", exec_name);
   fflush(stderr);
   _exit(-2);
+}
+
+char* strerror_g(errnum)
+  int errnum;
+{
+  static char knr_buffer[ 128 << 10 ];
+  memset(knr_buffer, 0, sizeof(knr_buffer));
+  return strerror_r(errnum, knr_buffer, sizeof(knr_buffer));
 }
 
 int main(argc, argv)
@@ -30,10 +41,11 @@ int main(argc, argv)
       exit(0);
     break;
     case -1:
-      fprintf(stderr, "Not accessible '%s'\n", argv[1]);
+      fprintf(stderr, "Not accessible '%s' due to the fact that GNU encountered ERROR: '%s'\n",
+              argv[1], strerror_g(errno));
     break;
     default:
-      fprintf(stderr, "Unknown error: '%d'\n", errno);
+      fprintf(stderr, "Unknown error: '%s'\n", strerror(errno));
     break;
   }
 
