@@ -29,6 +29,7 @@ char* strerror_g(errnum)
 #ifdef __APPLE__
   int p = strerror_r(errnum, knr_buffer, sizeof(knr_buffer));
   assert(p == 0);
+  (void)p;
   return knr_buffer;
 #endif
 }
