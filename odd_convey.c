@@ -34,14 +34,9 @@ freely, subject to the following restrictions:
 #ifndef _FILE_OFFSET_BIT
 #define _FILE_OFFSET_BIT 64
 #endif
-#ifdef __linux__
-#if __SIZE_WIDTH__ < 64
-#define PREAD_FUNC(a, b, c, d) pread64(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite64(a, b, c, d)
-#else
-#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
-#endif
+
+#ifdef __APPLE__
+#include <sys/types.h>
 #endif
 #include <unistd.h>
 #include <fcntl.h>
@@ -52,8 +47,28 @@ freely, subject to the following restrictions:
 #include <assert.h>
 #include <string.h>
 
+#ifdef __linux__
+#if __SIZE_WIDTH__ < 64
+#define PREAD_FUNC(a, b, c, d) pread64(a, b, c, d)
+#define PWRITE_FUNC(a, b, c, d) pwrite64(a, b, c, d)
+#else
+#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
+#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
+#endif
+#endif
+#ifdef __APPLE__
+#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
+#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
+typedef __darwin_off_t loff_t;
+#endif
+
+#ifdef __linux__
 static const char input_name[] = "/proc/kcore";
 // static const char input_name[] = "/dev/zero";
+#endif
+#ifdef __APPLE__
+static const char input_name[] = "/dev/zero";
+#endif
 static const char output_name[] = "/dev/null";
 static const long long K = 1ll << 10;
 static const long long M = 1ll << 20;
