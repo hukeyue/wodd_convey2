@@ -11,9 +11,13 @@ OBJ_FILES := $(SRC_FILES:.c=)
 OBJ32_FILES := $(SRC_FILES:.c=32)
 OBJ64_FILES := $(SRC_FILES:.c=64)
 
-.PHONY: all clean
+.PHONY: all clean obj32 obj64
 
-all : $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
+all : $(OBJ_FILES)
+
+obj32: $(OBJ32_FILES)
+
+obj64: $(OBJ64_FILES)
 
 %: %.c
 	$(CC) -o $@ $^ -march=native -O3
