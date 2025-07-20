@@ -9,10 +9,11 @@ CC ?= cc
 SRC_FILES := $(wildcard *.c)
 OBJ_FILES := $(SRC_FILES:.c=)
 OBJ32_FILES := $(SRC_FILES:.c=32)
+OBJ64_FILES := $(SRC_FILES:.c=64)
 
 .PHONY: all clean
 
-all : $(OBJ_FILES) $(OBJ32_FILES)
+all : $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
 
 %: %.c
 	$(CC) -o $@ $^
@@ -20,5 +21,8 @@ all : $(OBJ_FILES) $(OBJ32_FILES)
 %32: %.c
 	$(CC) -o $@ $^ -m32
 
+%64: %.c
+	$(CC) -o $@ $^ -m64
+
 clean:
-	-rm -f $(OBJ_FILES) $(OBJ32_FILES)
+	-rm -f $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
