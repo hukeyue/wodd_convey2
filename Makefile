@@ -21,4 +21,4 @@ all : $(OBJ_FILES) $(OBJ32_FILES)
 	$(CC) -o $@ $^ -m32
 
 clean:
-	-rm -f $(OBJ_FILES)
+	-rm -f $(OBJ_FILES) $(OBJ32_FILES)
