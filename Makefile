@@ -16,13 +16,13 @@ OBJ64_FILES := $(SRC_FILES:.c=64)
 all : $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
 
 %: %.c
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ -march=native -O3
 
 %32: %.c
-	$(CC) -o $@ $^ -m32
+	$(CC) -o $@ $^ -m32 -Os
 
 %64: %.c
-	$(CC) -o $@ $^ -m64
+	$(CC) -o $@ $^ -m64 -Os
 
 clean:
 	-rm -f $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
