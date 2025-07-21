@@ -20,13 +20,13 @@ obj32: $(OBJ32_FILES)
 obj64: $(OBJ64_FILES)
 
 %: %.c
-	$(CC) -o $@ $^ -march=native -O3
+	$(CC) -o $@ $^ -march=native -O3 -DNDEBUG
 
 %32: %.c
-	$(CC) -o $@ $^ -m32 -Os
+	$(CC) -o $@ $^ -m32 -Os -s
 
 %64: %.c
-	$(CC) -o $@ $^ -m64 -Os
+	$(CC) -o $@ $^ -m64 -Os -s
 
 clean:
 	-rm -f $(OBJ_FILES) $(OBJ32_FILES) $(OBJ64_FILES)
