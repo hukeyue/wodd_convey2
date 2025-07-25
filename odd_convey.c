@@ -77,9 +77,20 @@ static const loff_t offset = 12 * T;
 static const loff_t size = 16 * T;
 static const long slice = 8 * M;
 
-int main() {
+/* hold in-place */
+static void usage(const char* p_name) {
+  fprintf(stderr, "%s <in-place> <usage>\n", p_name);
+  fflush(stderr);
+}
+
+int main(int argc, const char** argv) {
   loff_t last_read = 0;
   loff_t last_seen = 0;
+
+  if (argc > 1) {
+    usage(argv[0]);
+    return -1;
+  }
 
   close(STDIN_FILENO);
 
