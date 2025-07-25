@@ -38,7 +38,6 @@ freely, subject to the following restrictions:
 #ifdef __APPLE__
 #include <sys/types.h>
 #endif
-#include <unistd.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -97,6 +96,7 @@ int main() {
     return -1;
   }
 
+  // Allocate the slice buffer
   void* buffer = malloc(slice);
   if (!buffer) {
     fprintf(stderr, "No memory to allocate\n");
@@ -144,7 +144,16 @@ int main() {
     }
   }
 
+  // Free the slice buffer
   free(buffer);
+
+  if (fsync(ofd) < 0) {
+    fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
+    fflush(stderr);
+    _exit(-1); // FIXME cleaner cleanup at exit
+    return -1;
+  }
+
   close(ifd);
   close(ofd);
 
