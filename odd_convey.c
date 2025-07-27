@@ -22,6 +22,7 @@ freely, subject to the following restrictions:
 
  */
 
+#ifdef __linux__
 #ifndef __USE_FILE_OFFSET64
 #define __USE_FILE_OFFSET64
 #endif
@@ -33,6 +34,7 @@ freely, subject to the following restrictions:
 #endif
 #ifndef _FILE_OFFSET_BIT
 #define _FILE_OFFSET_BIT 64
+#endif
 #endif
 
 #ifdef __APPLE__
