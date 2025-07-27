@@ -2,3 +2,4 @@ A dd command appeared in Version 5 AT&T UNIX.
 The pread() function call appeared in AT&T System V Release 4 UNIX.
 The fsync() function call appeared in 4.2BSD.
 The sendfile() system call first appeared in Darwin 9.0.
+A write() function call appeared in Version 6 AT&T UNIX.
