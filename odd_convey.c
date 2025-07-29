@@ -65,11 +65,22 @@ freely, subject to the following restrictions:
 typedef __darwin_off_t loff_t;
 #endif // __APPLE__
 
+#ifdef __FreeBSD__
+#include <sys/types.h>
+#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
+#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
+typedef __off64_t loff_t;
+#endif // __FreeBSD__
+
 #ifdef __linux__
 static const char input_name[] = "/proc/kcore";
 // static const char input_name[] = "/dev/zero";
 #endif
 #ifdef __APPLE__
+static const char input_name[] = "/dev/zero";
+#endif
+
+#ifdef __FreeBSD__
 static const char input_name[] = "/dev/zero";
 #endif
 static const char output_name[] = "/dev/null";
