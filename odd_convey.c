@@ -35,11 +35,11 @@ freely, subject to the following restrictions:
 #ifndef _FILE_OFFSET_BIT
 #define _FILE_OFFSET_BIT 64
 #endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif // _GNU_SOURCE
 #endif
 
-#ifdef __APPLE__
-#include <sys/types.h>
-#endif
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -55,13 +55,15 @@ freely, subject to the following restrictions:
 #else
 #define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
 #define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
-#endif
-#endif
+#endif // __SIZE_WIDTH__
+#endif // __linux__
+
 #ifdef __APPLE__
+#include <sys/types.h>
 #define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
 #define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
 typedef __darwin_off_t loff_t;
-#endif
+#endif // __APPLE__
 
 #ifdef __linux__
 static const char input_name[] = "/proc/kcore";

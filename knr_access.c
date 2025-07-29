@@ -3,6 +3,7 @@
 #define _GNU_SOURCE
 #endif // _GNU_SOURCE
 #endif // __linux__
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@ char* strerror_g(errnum)
 #ifdef __APPLE__
   int p = strerror_r(errnum, knr_buffer, sizeof(knr_buffer));
   assert(p == 0);
-  (void)p;
+  (void)&p;
   return knr_buffer;
 #endif
 }

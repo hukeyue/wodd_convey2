@@ -49,8 +49,8 @@ flags = [
 '-Wno-long-long',
 '-Wno-variadic-macros',
 '-Wno-deprecated-non-prototype',
-'-D_GNU_SOURCE',
 '-DNDEBUG',
+'-D_FORTIFY_SOURCE=2',
 # THIS IS IMPORTANT! Without the '-x' flag, Clang won't know which language to
 # use when compiling headers. So it will guess.
 '-x',
