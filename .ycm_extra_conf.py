@@ -48,6 +48,7 @@ flags = [
 '-Werror',
 '-Wno-long-long',
 '-Wno-variadic-macros',
+'-Wno-deprecated-non-prototype',
 '-D_GNU_SOURCE',
 '-DNDEBUG',
 # THIS IS IMPORTANT! Without the '-x' flag, Clang won't know which language to
