@@ -35,7 +35,7 @@ import subprocess
 DIR_OF_THIS_SCRIPT = p.abspath( p.dirname( __file__ ) )
 DIR_OF_THIRD_PARTY = p.join( DIR_OF_THIS_SCRIPT, 'third_party' )
 DIR_OF_WATCHDOG_DEPS = p.join( DIR_OF_THIRD_PARTY, 'watchdog_deps' )
-SOURCE_EXTENSIONS = [ '.cpp', '.cxx', '.cc', '.c', '.m', '.mm' ]
+SOURCE_EXTENSIONS = [ '.c', '.m' ]
 
 database = None
 
@@ -48,15 +48,13 @@ flags = [
 '-Werror',
 '-Wno-long-long',
 '-Wno-variadic-macros',
-'-fexceptions',
+'-D_GNU_SOURCE',
 '-DNDEBUG',
 # THIS IS IMPORTANT! Without the '-x' flag, Clang won't know which language to
-# use when compiling headers. So it will guess. Badly. So C++ headers will be
-# compiled as C headers. You don't want that so ALWAYS specify the '-x' flag.
-# For a C project, you would set this to 'c' instead of 'c++'.
+# use when compiling headers. So it will guess.
 '-x',
-'c++',
-'-std=c++17',
+'c',
+'-std=c99',
 ]
 
 # Set this to the absolute path to the folder (NOT the file!) containing the
@@ -74,7 +72,7 @@ compilation_database_folder = p.join(DIR_OF_THIS_SCRIPT, 'build')
 
 def IsHeaderFile( filename ):
   extension = p.splitext( filename )[ 1 ]
-  return extension in [ '.h', '.hxx', '.hpp', '.hh' ]
+  return extension == '.h'
 
 
 def FindCorrespondingSourceFile( filename ):
@@ -129,14 +127,6 @@ def Settings( **kwargs ):
     # Bear in mind that compilation_info.compiler_flags_ does NOT return a
     # python list, but a "list-like" StringVec object.
     final_flags = list( compilation_info.compiler_flags_ )
-
-    # NOTE: This is just for YouCompleteMe; it's highly likely that your project
-    # does NOT need to remove the stdlib flag. DO NOT USE THIS IN YOUR
-    # ycm_extra_conf IF YOU'RE NOT 100% SURE YOU NEED IT.
-    try:
-      final_flags.remove( '-stdlib=libc++' )
-    except ValueError:
-      pass
 
     # skip universal build flag which causing libclang's AST Parsing issues
     final_flags_copy = final_flags
