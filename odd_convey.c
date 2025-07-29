@@ -67,6 +67,9 @@ typedef __darwin_off_t loff_t;
 
 #ifdef __FreeBSD__
 #include <sys/types.h>
+#ifndef _OFF64_T_DECLARED
+#error Offset (Alias) not defined
+#endif
 #define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
 #define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
 typedef __off64_t loff_t;
