@@ -176,12 +176,14 @@ int main(int argc, const char** argv) {
   // Free the slice buffer
   free(buffer);
 
+#ifndef __linux__
   if (fsync(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
     fflush(stderr);
     _exit(-1); // FIXME cleaner cleanup at exit
     return -1;
   }
+#endif
 
   close(ifd);
   close(ofd);
