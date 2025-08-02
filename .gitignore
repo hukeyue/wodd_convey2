@@ -1,8 +1,8 @@
-odd_convey
+odd_convey*
 odd_convey32
 *.o
-access
-knr_access
+access*
+knr_access*
 a.out
 access32
 knr_access32
