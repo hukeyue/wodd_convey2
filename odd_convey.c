@@ -128,13 +128,16 @@ int main(int argc, const char** argv) {
   // Allocate the slice buffer
   void* buffer = malloc(slice);
   if (!buffer) {
-    fprintf(stderr, "No memory to allocate\n");
+    close(ofd);
+    close(ifd);
     fflush(stderr);
+    usage(argv[0]);
     return -1;
   }
   fprintf(stdout, "Initialized memory convey from %s to %s,"
           " skip %d TiB, total size %d TiB\n",
           input_name, output_name, (int)(offset / T), (int)(size / T));
+  fflush(stdout);
   for (int read = 0, written = 0; last_read < size;) {
     assert(slice <= __INT_MAX__);
     read = PREAD_FUNC(ifd, buffer, slice, offset + last_read);
@@ -185,8 +188,8 @@ int main(int argc, const char** argv) {
   }
 #endif
 
-  close(ifd);
   close(ofd);
+  close(ifd);
 
   if (last_read == size) {
     fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)size/T);
