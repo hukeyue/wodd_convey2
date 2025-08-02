@@ -104,40 +104,43 @@ static void usage(const char* p_name) {
 int main(int argc, const char** argv) {
   loff_t last_read = 0;
   loff_t last_seen = 0;
+  const char* const prog_name = argv[0];
 
   if (argc > 1) {
-    usage(argv[0]);
+    usage(prog_name);
+    fflush(stdout);
     return -1;
   }
 
-  close(STDIN_FILENO);
+  if (close(STDIN_FILENO) < 0) {
+    fprintf(stderr, "%s\n", "Unstable input tty console");
+    fflush(stderr);
+    goto print_and_exit;
+  }
+  fflush(stdout);
 
   int ifd = open(input_name, O_RDONLY, 0);
   if (ifd < 0) {
     fprintf(stderr, "Failed to open file (input) %s: %s\n", input_name, strerror(errno));
     fflush(stderr);
-    return -1;
+    goto print_and_exit;
   }
   int ofd = open(output_name, O_WRONLY, 0);
   if (ofd < 0) {
     fprintf(stderr, "Failed to open file (output) %s: %s\n", output_name, strerror(errno));
     fflush(stderr);
-    return -1;
+    goto print_and_exit;
   }
 
-  // Allocate the slice buffer
+  // Allocate the slice buffer (quite large)
   void* buffer = malloc(slice);
   if (!buffer) {
-    close(ofd);
-    close(ifd);
-    fflush(stderr);
-    usage(argv[0]);
-    return -1;
+    usage(prog_name);
+    goto close_and_exit;
   }
   fprintf(stdout, "Initialized memory convey from %s to %s,"
           " skip %d TiB, total size %d TiB\n",
           input_name, output_name, (int)(offset / T), (int)(size / T));
-  fflush(stdout);
   for (int read = 0, written = 0; last_read < size;) {
     assert(slice <= __INT_MAX__);
     read = PREAD_FUNC(ifd, buffer, slice, offset + last_read);
@@ -147,12 +150,12 @@ int main(int argc, const char** argv) {
       }
       fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
       fflush(stderr);
-      break;
+      goto print_and_exit;
     }
     if (read == 0) {
       fprintf(stderr, "EOF\n");
       fflush(stderr);
-      break;
+      goto print_and_exit;
     }
     assert(read <= slice);
     written = PWRITE_FUNC(ofd, buffer, read, last_read);
@@ -162,12 +165,12 @@ int main(int argc, const char** argv) {
       }
       fprintf(stderr, "Failed to write file %s: %s\n", output_name, strerror(errno));
       fflush(stderr);
-      break;
+      goto print_and_exit;
     }
     if (written != read) {
       fprintf(stderr, "Partial written %d bytes, expected %d bytes\n", written, read);
       fflush(stderr);
-      break;
+      goto print_and_exit;
     }
     last_read += read;
     if (last_read - last_seen >= size / 100) {
@@ -176,25 +179,32 @@ int main(int argc, const char** argv) {
     }
   }
 
-  // Free the slice buffer
+  goto nice_clean_up;
+
+nice_clean_up:
+  // Free the slice buffer (to freelist)
   free(buffer);
 
 #ifndef __linux__
   if (fsync(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
     fflush(stderr);
-    _exit(-1); // FIXME cleaner cleanup at exit
-    return -1;
+    goto close_and_exit;
   }
 #endif
 
+close_and_exit:
   if (close(ofd) < 0) {
+    close(ifd); // rev erse order
     fflush(stderr);
-    _exit(-1); // FIXME cleaner cleanup at exit
+    // we should quit silently
+    _exit(255);
     return -1;
   }
   close(ifd);
+  goto print_and_exit;
 
+print_and_exit:
   if (last_read == size) {
     fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)size/T);
   } else {
