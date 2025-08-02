@@ -93,9 +93,9 @@ static const long long K = 1ll << 10;
 static const long long M = 1ll << 20;
 static const long long G = 1ll << 30;
 static const long long T = 1ll << 40;
-static const loff_t offset = 12 * T;
-static const loff_t size = 16 * T;
-static const long slice = 8 * M;
+static const loff_t OFFSET = 12 * T;
+static const loff_t SIZE = 16 * T;
+static const long SLICE = 8 * M;
 
 /* hold in-place */
 static void usage(const char* p_name, intptr_t unused_parameter) {
@@ -105,11 +105,12 @@ static void usage(const char* p_name, intptr_t unused_parameter) {
 }
 
 static void dot(loff_t *last_seen, loff_t last_read) {
-  if (/*unlikely*/ __builtin_expect(last_read == size, 0)) {
+  if (/*unlikely*/ __builtin_expect(last_read == SIZE, 0)) {
     fprintf(stdout, "Progress 100 over 100 percent (STAR)\n");
     *last_seen = last_read;
-  } else if (/*guess*/ last_read - *last_seen >= size / 100) {
-    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / size);
+    fflush(stdout); /* fsync on last dot */
+  } else if (/*guess*/ last_read - *last_seen >= SIZE / 100) {
+    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / SIZE);
     *last_seen = last_read;
   }
 }
@@ -155,7 +156,7 @@ int main(int argc, const char** argv) {
   }
 
   /* Allocate the slice buffer (quite large) */
-  p_buffer = malloc(slice + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
+  p_buffer = malloc(SLICE + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
   if (!p_buffer) {
     usage(prog_name, buffer);
     goto close_and_exit;
@@ -165,15 +166,15 @@ int main(int argc, const char** argv) {
 #elif defined(__FreeBSD__)
   srandomdev();
 #else
-  srandom(*(int*)&p_buffer[slice]);
-  memset(p_buffer, rand(), slice);
+  srandom(*(int*)&p_buffer[SLICE]);
+  memset(p_buffer, rand(), SLICE);
 #endif
   fprintf(stdout, "Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
-          input_name, output_name, (long)(offset / T), (long)(size / T), (long)(slice / M));
-  for (int read = 0, written = 0; dot(&last_seen, last_read), last_read < size;) {
-    assert(slice <= __INT_MAX__);
-    read = PREAD_FUNC(ifd, p_buffer, slice, offset + last_read);
+          input_name, output_name, (long)(OFFSET / T), (long)(SIZE / T), (long)(SLICE / M));
+  for (int read = 0, written = 0; dot(&last_seen, last_read), last_read < SIZE;) {
+    assert(SLICE <= __INT_MAX__);
+    read = PREAD_FUNC(ifd, p_buffer, SLICE, OFFSET + last_read);
     if (read < 0) {
       if (errno == EAGAIN || errno == EINTR) {
         continue;
@@ -187,7 +188,7 @@ int main(int argc, const char** argv) {
       fflush(stderr);
       goto print_and_exit;
     }
-    assert(read <= slice);
+    assert(read <= SLICE);
     written = PWRITE_FUNC(ofd, p_buffer, read, last_read);
     if (written < 0) {
       if (errno == EAGAIN || errno == EINTR) {
@@ -242,10 +243,10 @@ close_and_exit:
   goto print_and_exit;
 
 print_and_exit:
-  if (last_read == size) {
-    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)size/T);
+  if (last_read == SIZE) {
+    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)SIZE/T);
   } else {
-    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)size/T);
+    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)SIZE/T);
     fflush(stderr);
     return -1;
   }
