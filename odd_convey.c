@@ -104,6 +104,16 @@ static void usage(const char* p_name, intptr_t unused_parameter) {
   (void)unused_parameter;
 }
 
+static void dot(loff_t *last_seen, loff_t last_read) {
+  if (/*unlikely*/ __builtin_expect(last_read == size, 0)) {
+    fprintf(stdout, "Progress 100 over 100 percent (STAR)\n");
+    *last_seen = last_read;
+  } else if (/*guess*/ last_read - *last_seen >= size / 100) {
+    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / size);
+    *last_seen = last_read;
+  }
+}
+
 int main(int argc, const char** argv) {
   loff_t last_read = 0;
   loff_t last_seen = 0;
@@ -145,7 +155,7 @@ int main(int argc, const char** argv) {
   }
 
   /* Allocate the slice buffer (quite large) */
-  p_buffer = malloc(slice + /* 0 + */ sizeof(int));
+  p_buffer = malloc(slice + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
   if (!p_buffer) {
     usage(prog_name, buffer);
     goto close_and_exit;
@@ -154,15 +164,14 @@ int main(int argc, const char** argv) {
   sranddev();
 #elif defined(__FreeBSD__)
   srandomdev();
-#endif
+#else
+  srandom(*(int*)&p_buffer[slice]);
   memset(p_buffer, rand(), slice);
+#endif
   fprintf(stdout, "Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
           input_name, output_name, (long)(offset / T), (long)(size / T), (long)(slice / M));
-#ifdef __linux__
-  srandom(*(int*)&p_buffer[slice]);
-#endif
-  for (int read = 0, written = 0; last_read < size;) {
+  for (int read = 0, written = 0; dot(&last_seen, last_read), last_read < size;) {
     assert(slice <= __INT_MAX__);
     read = PREAD_FUNC(ifd, p_buffer, slice, offset + last_read);
     if (read < 0) {
@@ -194,10 +203,6 @@ int main(int argc, const char** argv) {
       goto print_and_exit;
     }
     last_read += read;
-    if (last_read - last_seen >= size / 100) {
-      fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / size);
-      last_seen = last_read;
-    }
   }
 
   /* FreeBSD blesses you */
@@ -211,7 +216,10 @@ flush_and_exit:
   fflush(stdout);
 
 nice_clean_up:
-  /* Free the slice buffer (to freelist) */
+  /* DeInitialize the rand seed prior to appending on freelist */
+  srand(~0);
+
+  /* Free the slice buffer (appended to freelist) */
   free(p_buffer);
 
 #ifndef __linux__
@@ -241,7 +249,4 @@ print_and_exit:
     fflush(stderr);
     return -1;
   }
-
-  // DeInitialize the rand seed prior to exit routine
-  srand(0);
 }
