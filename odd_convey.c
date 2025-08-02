@@ -47,6 +47,8 @@ freely, subject to the following restrictions:
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #ifdef __linux__
 #if __SIZE_WIDTH__ < 64
@@ -96,28 +98,38 @@ static const loff_t size = 16 * T;
 static const long slice = 8 * M;
 
 /* hold in-place */
-static void usage(const char* p_name) {
+static void usage(const char* p_name, intptr_t unused_parameter) {
   fprintf(stderr, "%s <in-place> <usage>\n", p_name);
   fflush(stderr);
+  (void)unused_parameter;
 }
 
 int main(int argc, const char** argv) {
   loff_t last_read = 0;
   loff_t last_seen = 0;
   const char* const prog_name = argv[0];
+  int buffer = rand();
+  void* p_buffer;
 
+  /* hang on --background boot */
   if (argc > 1) {
-    usage(prog_name);
+    usage(prog_name, buffer);
     fflush(stdout);
-    return -1;
+    goto print_and_exit;
   }
 
+  /* eject when unsafe */
   if (close(STDIN_FILENO) < 0) {
     fprintf(stderr, "%s\n", "Unstable input tty console");
     fflush(stderr);
     goto print_and_exit;
   }
+
+  /* cleanup previous output */
   fflush(stdout);
+
+  /* Initialize the rand seed prior to ifd */
+  srand((int)(intptr_t)prog_name);
 
   int ifd = open(input_name, O_RDONLY, 0);
   if (ifd < 0) {
@@ -132,18 +144,20 @@ int main(int argc, const char** argv) {
     goto print_and_exit;
   }
 
-  // Allocate the slice buffer (quite large)
-  void* buffer = malloc(slice << 30);
-  if (!buffer) {
-    usage(prog_name);
+  /* Allocate the slice buffer (quite large) */
+  p_buffer = malloc(slice + /* 0 + */ 30);
+  if (!p_buffer) {
+    usage(prog_name, buffer);
     goto close_and_exit;
   }
+  memset(p_buffer, 0x81, slice);
   fprintf(stdout, "Initialized memory convey from %s to %s,"
-          " skip %d TiB, total size %d TiB\n",
-          input_name, output_name, (int)(offset / T), (int)(size / T));
+          " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
+          input_name, output_name, (long)(offset / T), (long)(size / T), (long)(slice / M));
+  srand(buffer);
   for (int read = 0, written = 0; last_read < size;) {
     assert(slice <= __INT_MAX__);
-    read = PREAD_FUNC(ifd, buffer, slice, offset + last_read);
+    read = PREAD_FUNC(ifd, p_buffer, slice, offset + last_read);
     if (read < 0) {
       if (errno == EAGAIN || errno == EINTR) {
         continue;
@@ -158,7 +172,7 @@ int main(int argc, const char** argv) {
       goto print_and_exit;
     }
     assert(read <= slice);
-    written = PWRITE_FUNC(ofd, buffer, read, last_read);
+    written = PWRITE_FUNC(ofd, p_buffer, read, last_read);
     if (written < 0) {
       if (errno == EAGAIN || errno == EINTR) {
         continue;
@@ -168,7 +182,7 @@ int main(int argc, const char** argv) {
       goto print_and_exit;
     }
     if (written != read) {
-      fprintf(stderr, "Partial written %d bytes, expected %d bytes\n", written, read);
+      fprintf(stderr, "Partial written %6d bytes, expected %6d bytes\n", written, read);
       fflush(stderr);
       goto print_and_exit;
     }
@@ -179,13 +193,18 @@ int main(int argc, const char** argv) {
     }
   }
 
+  if (rand()) {
+    goto flush_and_exit;
+  }
+
   goto nice_clean_up;
 
+flush_and_exit:
   fflush(stdout);
 
 nice_clean_up:
-  // Free the slice buffer (to freelist)
-  free(buffer);
+  /* Free the slice buffer (to freelist) */
+  free(p_buffer);
 
 #ifndef __linux__
   if (fsync(ofd) < 0) {
@@ -197,9 +216,9 @@ nice_clean_up:
 
 close_and_exit:
   if (close(ofd) < 0) {
-    close(ifd); // rev erse order
+    close(ifd); /* rev erse order */
     fflush(stderr);
-    // we should quit silently
+    // we should do it silently just like usage()
     _exit(255);
     return -1;
   }
@@ -214,4 +233,7 @@ print_and_exit:
     fflush(stderr);
     return -1;
   }
+
+  // DeInitialize the rand seed prior to exit routine
+  srand(0);
 }
