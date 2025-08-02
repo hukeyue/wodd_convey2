@@ -189,7 +189,7 @@ nice_clean_up:
   if (fsync(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
     fflush(stderr);
-    goto close_and_exit;
+    goto print_and_exit;
   }
 #endif
 
