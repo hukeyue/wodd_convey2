@@ -6,19 +6,29 @@
 ##
 ## This program built for i386-apple-darwin11.3.0
 ##
-## Targeting amd64 machine type
-CC ?= clang
-SRC_FILES := $(wildcard *.c)
+## Targeting amd64 machine type and gnu linux system
 TARGET := aarch64-gnu-linux
 SYSROOT := /
+
+SRC_FILES := $(wildcard *.c)
 CROSS_OBJS := $(SRC_FILES:.c=-$(TARGET))
+
+CC ?= clang
+
+CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=2
+CFLAGS := $(CPPFLAGS) -O3 --target=$(TARGET) --sysroot $(SYSROOT)
+LDFLAGS := -fuse-ld=lld
+
+ifneq ($(findstring freebsd,$(TARGET)),)
+	LDFLAGS += -Wl,-L$(PWD)/freebsd
+endif
 
 .PHONY: all clean
 
 all : $(CROSS_OBJS)
 
 %-$(TARGET): %.c
-	$(CC) -o $@ $^ --target=$(TARGET) --sysroot $(SYSROOT) -fuse-ld=lld -O3 -DNDEBUG -D_FORTIFY_SOURCE=2
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 clean:
 	-rm -f $(CROSS_OBJS)

@@ -125,7 +125,7 @@ int main(int argc, const char** argv) {
     goto print_and_exit;
   }
 
-  /* cleanup previous output */
+  /* clean previous output up */
   fflush(stdout);
 
   /* Initialize the rand seed prior to ifd */
@@ -145,16 +145,23 @@ int main(int argc, const char** argv) {
   }
 
   /* Allocate the slice buffer (quite large) */
-  p_buffer = malloc(slice + /* 0 + */ 30);
+  p_buffer = malloc(slice + /* 0 + */ sizeof(int));
   if (!p_buffer) {
     usage(prog_name, buffer);
     goto close_and_exit;
   }
-  memset(p_buffer, 0x81, slice);
+#ifdef __APPLE__
+  sranddev();
+#elif defined(__FreeBSD__)
+  srandomdev();
+#endif
+  memset(p_buffer, rand(), slice);
   fprintf(stdout, "Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
           input_name, output_name, (long)(offset / T), (long)(size / T), (long)(slice / M));
-  srand(buffer);
+#ifdef __linux__
+  srandom(*(int*)&p_buffer[slice]);
+#endif
   for (int read = 0, written = 0; last_read < size;) {
     assert(slice <= __INT_MAX__);
     read = PREAD_FUNC(ifd, p_buffer, slice, offset + last_read);
@@ -193,7 +200,8 @@ int main(int argc, const char** argv) {
     }
   }
 
-  if (rand()) {
+  /* FreeBSD blesses you */
+  if (!!!rand()) {
     goto flush_and_exit;
   }
 
