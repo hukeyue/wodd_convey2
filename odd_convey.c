@@ -133,7 +133,7 @@ int main(int argc, const char** argv) {
   }
 
   // Allocate the slice buffer (quite large)
-  void* buffer = malloc(slice);
+  void* buffer = malloc(slice << 30);
   if (!buffer) {
     usage(prog_name);
     goto close_and_exit;
@@ -180,6 +180,8 @@ int main(int argc, const char** argv) {
   }
 
   goto nice_clean_up;
+
+  fflush(stdout);
 
 nice_clean_up:
   // Free the slice buffer (to freelist)
