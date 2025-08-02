@@ -1,0 +1,24 @@
+## GNU Make 3.81
+## Copyright (C) 2006  Free Software Foundation, Inc.
+## This is free software; see the source for copying conditions.
+## There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+## PARTICULAR PURPOSE.
+##
+## This program built for i386-apple-darwin11.3.0
+##
+## Targeting amd64 machine type
+CC ?= clang
+SRC_FILES := $(wildcard *.c)
+CROSS_OBJS := $(SRC_FILES:.c=)
+TARGET := aarch64-gnu-linux
+SYSROOT := /
+
+.PHONY: all clean
+
+all : $(CROSS_OBJS)
+
+%: %.c
+	$(CC) -o $@ $^ --target=$(TARGET) --sysroot $(SYSROOT) -fuse-ld=lld -O3 -DNDEBUG -D_FORTIFY_SOURCE=2
+
+clean:
+	-rm -f $(CROSS_OBJS)
