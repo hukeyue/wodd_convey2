@@ -189,9 +189,9 @@ int main(int argc, const char** argv) {
   close(ofd);
 
   if (last_read == size) {
-    fprintf(stdout, "Successfully written %lf TiB\n", (double)size/T);
+    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)size/T);
   } else {
-    fprintf(stderr, "Written %lf TiB, expected %lf TiB\n", (double)last_read/T, (double)size/T);
+    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)size/T);
     fflush(stderr);
     return -1;
   }
