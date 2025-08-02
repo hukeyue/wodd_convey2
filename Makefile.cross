@@ -9,15 +9,15 @@
 ## Targeting amd64 machine type
 CC ?= clang
 SRC_FILES := $(wildcard *.c)
-CROSS_OBJS := $(SRC_FILES:.c=)
 TARGET := aarch64-gnu-linux
 SYSROOT := /
+CROSS_OBJS := $(SRC_FILES:.c=-$(TARGET))
 
 .PHONY: all clean
 
 all : $(CROSS_OBJS)
 
-%: %.c
+%-$(TARGET): %.c
 	$(CC) -o $@ $^ --target=$(TARGET) --sysroot $(SYSROOT) -fuse-ld=lld -O3 -DNDEBUG -D_FORTIFY_SOURCE=2
 
 clean:
