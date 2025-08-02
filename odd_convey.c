@@ -188,7 +188,11 @@ int main(int argc, const char** argv) {
   }
 #endif
 
-  close(ofd);
+  if (close(ofd) < 0) {
+    fflush(stderr);
+    _exit(-1); // FIXME cleaner cleanup at exit
+    return -1;
+  }
   close(ifd);
 
   if (last_read == size) {
