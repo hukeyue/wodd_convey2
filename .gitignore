@@ -10,3 +10,5 @@ odd_convey64
 access64
 knr_access64
 *.sh
+*.swp
+*.exe

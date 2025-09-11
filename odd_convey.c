@@ -1,25 +1,23 @@
-/* Precision Library
-   Copyright (C) 2025 Free Software Foundation, Inc.
-   Written by Keeyou <keeyou@invalid-load.io>
-
-(C) 2025 Keyue Hu
-
-This software is provided 'as-is', without any express or implied
-warranty.  In no event will the authors be held liable for any damages
-arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must not
-   claim that you wrote the original software. If you use this software
-   in a product, an acknowledgment in the product documentation would be
-   appreciated but is not required.
-2. Altered source versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-3. This notice may not be removed or altered from any source distribution.
-
+// SPDX-License-Identifier: CDDL-1.0
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or https://opensource.org/licenses/CDDL-1.0.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
  */
 
 #ifdef __linux__
@@ -41,9 +39,15 @@ freely, subject to the following restrictions:
 #endif
 
 #include <fcntl.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <unistd.h>
+#endif
 #include <stdio.h>
+#ifndef _WIN32
 #include <errno.h>
+#endif
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
@@ -51,19 +55,22 @@ freely, subject to the following restrictions:
 #include <stdint.h>
 
 #ifdef __linux__
-#if __SIZE_WIDTH__ < 64
-#define PREAD_FUNC(a, b, c, d) pread64(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite64(a, b, c, d)
+#if __TOTAL_SIZE_WIDTH__ < 64
+#define LSEEK_FUNC(a, b, c) lseek64(a, b, c)
+#define READ_FUNC(a, b, c) read(a, b, c)
+#define WRITE_FUNC(a, b, c) write(a, b, c)
 #else
-#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
-#endif // __SIZE_WIDTH__
+#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
+#define READ_FUNC(a, b, c) read(a, b, c)
+#define WRITE_FUNC(a, b, c) write(a, b, c)
+#endif // __TOTAL_SIZE_WIDTH__
 #endif // __linux__
 
 #ifdef __APPLE__
 #include <sys/types.h>
-#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
+#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
+#define READ_FUNC(a, b, c) read(a, b, c)
+#define WRITE_FUNC(a, b, c) write(a, b, c)
 typedef __darwin_off_t loff_t;
 #endif // __APPLE__
 
@@ -72,10 +79,18 @@ typedef __darwin_off_t loff_t;
 #ifndef _OFF64_T_DECLARED
 #error Offset (Alias) not defined
 #endif
-#define PREAD_FUNC(a, b, c, d) pread(a, b, c, d)
-#define PWRITE_FUNC(a, b, c, d) pwrite(a, b, c, d)
+#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
+#define READ_FUNC(a, b, c) read(a, b, c)
+#define WRITE_FUNC(a, b, c) write(a, b, c)
 typedef __off64_t loff_t;
 #endif // __FreeBSD__
+
+#ifdef _WIN32
+typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
+#define LSEEK_FUNC(a, b, c) ({ LARGE_INTEGER B; B.QuadPart = b; lseekInt(a, B, c); })
+#define READ_FUNC(a, b, c) readInt(a, b, c)
+#define WRITE_FUNC(a, b, c) writeInt(a, b, c)
+#endif
 
 #ifdef __linux__
 static const char input_name[] = "/proc/kcore";
@@ -88,37 +103,115 @@ static const char input_name[] = "/dev/zero";
 #ifdef __FreeBSD__
 static const char input_name[] = "/dev/zero";
 #endif
+
+#ifdef _WIN32
+static const wchar_t input_name[] = L"NUL";
+#endif
+
+#ifdef _WIN32
+static const wchar_t output_name[] = L"NUL";
+#else
 static const char output_name[] = "/dev/null";
+#endif
 static const long long K = 1ll << 10;
 static const long long M = 1ll << 20;
 static const long long G = 1ll << 30;
 static const long long T = 1ll << 40;
 static const loff_t OFFSET = 12 * T;
-static const loff_t SIZE = 16 * T;
+static const loff_t TOTAL_SIZE = 16 * T;
 static const long SLICE = 8 * M;
 
 /* hold in-place */
+#ifdef _WIN32
+static void usage(const wchar_t* p_name, intptr_t unused_parameter) {
+  fprintf(stderr, "%ws <in-place> <usage>\n", p_name);
+  fflush(stderr);
+  (void)unused_parameter;
+}
+#else
 static void usage(const char* p_name, intptr_t unused_parameter) {
   fprintf(stderr, "%s <in-place> <usage>\n", p_name);
   fflush(stderr);
   (void)unused_parameter;
 }
+#endif
 
 static void dot(loff_t *last_seen, loff_t last_read) {
-  if (/*unlikely*/ __builtin_expect(last_read == SIZE, 0)) {
+  if (/*unlikely*/ __builtin_expect(last_read == TOTAL_SIZE, 0)) {
     fprintf(stdout, "Progress 100 over 100 percent (STAR)\n");
     *last_seen = last_read;
     fflush(stdout); /* fsync on last dot */
-  } else if (/*guess*/ last_read - *last_seen >= SIZE / 100) {
-    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / SIZE);
+  } else if (/*guess*/ last_read - *last_seen >= TOTAL_SIZE / 100) {
+    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / TOTAL_SIZE);
     *last_seen = last_read;
   }
 }
 
-int main(int argc, const char** argv) {
+#ifdef _WIN32
+static const wchar_t* wGetLastErrorMessage() {
+  DWORD errorCode = GetLastError();
+  static WCHAR buffer[64 << 10];
+
+  DWORD result = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
+    FORMAT_MESSAGE_IGNORE_INSERTS,
+    NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+    buffer, sizeof(buffer)/sizeof(buffer[0]), NULL);
+
+  if (result == 0) {
+    return L"Failed to get error message";
+  }
+
+  return buffer;
+}
+static int lseekInt(HANDLE hFile, LARGE_INTEGER offset, int whence) {
+  DWORD dwMoveMethod;
+  switch (whence) {
+    case SEEK_SET:
+      dwMoveMethod = FILE_BEGIN;
+      break;
+    case SEEK_CUR:
+      dwMoveMethod = FILE_CURRENT;
+      break;
+    case SEEK_END:
+      dwMoveMethod = FILE_END;
+      break;
+    default:
+      return -1;
+  }
+  if (!SetFilePointerEx(hFile, offset, NULL, dwMoveMethod)) {
+    return -1;
+  }
+  return 0;
+}
+static DWORD readInt(HANDLE hFile, void *buf, size_t nbyte) {
+  DWORD bytesRead;
+  if (!ReadFile(hFile, buf, nbyte, &bytesRead, NULL)) {
+    return -1;
+  }
+  return bytesRead;
+}
+
+static DWORD writeInt(HANDLE hFile, const void *buf, size_t nbyte) {
+  DWORD bytesWritten;
+  if (!WriteFile(hFile, buf, nbyte, &bytesWritten, NULL)) {
+    return -1;
+  }
+  return bytesWritten;
+}
+#endif
+
+#ifdef _WIN32
+int wmain(int argc, const wchar_t* argv[]) {
+#else
+int main(int argc, const char* argv[]) {
+#endif
   loff_t last_read = 0;
   loff_t last_seen = 0;
+#ifdef _WIN32
+  const wchar_t* const prog_name = argv[0];
+#else
   const char* const prog_name = argv[0];
+#endif
   int buffer = rand();
   void* p_buffer;
 
@@ -142,15 +235,27 @@ int main(int argc, const char** argv) {
   /* Initialize the rand seed prior to ifd */
   srand((int)(intptr_t)prog_name);
 
+#ifdef _WIN32
+  HANDLE ifd = CreateFileW(input_name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (ifd == INVALID_HANDLE_VALUE) {
+    fprintf(stderr, "Failed to open file (input) %ws: %ws\n", input_name, wGetLastErrorMessage());
+#else
   int ifd = open(input_name, O_RDONLY, 0);
   if (ifd < 0) {
     fprintf(stderr, "Failed to open file (input) %s: %s\n", input_name, strerror(errno));
+#endif
     fflush(stderr);
     goto print_and_exit;
   }
+#ifdef _WIN32
+  HANDLE ofd = CreateFileW(output_name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (ofd == INVALID_HANDLE_VALUE) {
+    fprintf(stderr, "Failed to open file (output) %ws: %ws\n", output_name, wGetLastErrorMessage());
+#else
   int ofd = open(output_name, O_WRONLY, 0);
   if (ofd < 0) {
     fprintf(stderr, "Failed to open file (output) %s: %s\n", output_name, strerror(errno));
+#endif
     fflush(stderr);
     goto print_and_exit;
   }
@@ -165,45 +270,67 @@ int main(int argc, const char** argv) {
   sranddev();
 #elif defined(__FreeBSD__)
   srandomdev();
-#else
-  srandom(*(int*)&p_buffer[SLICE]);
-  memset(p_buffer, rand(), SLICE);
+#elif !defined(_WIN32)
+  srandom(*(int*)&p_buffer[SLICE]); // TODO: RtlGenRandom:SystemFunction036
 #endif
-  fprintf(stdout, "Initialized memory convey from %s to %s,"
+  memset(p_buffer, rand(), SLICE);
+  fprintf(stdout, "Initialized memory convey "
+#ifdef _WIN32
+          "from %ws to %ws,"
+#else
+          "from %s to %s,"
+#endif
           " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
-          input_name, output_name, (long)(OFFSET / T), (long)(SIZE / T), (long)(SLICE / M));
-  for (int read = 0, written = 0; dot(&last_seen, last_read), last_read < SIZE;) {
+          input_name, output_name, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
+  if (LSEEK_FUNC(ifd, OFFSET, SEEK_SET) < 0) {
+#ifdef _WIN32
+    fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
+#else
+    fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
+#endif
+    fflush(stderr);
+    goto print_and_exit;
+  }
+  for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
     assert(SLICE <= __INT_MAX__);
-    read = PREAD_FUNC(ifd, p_buffer, SLICE, OFFSET + last_read);
-    if (read < 0) {
+    num_read = READ_FUNC(ifd, p_buffer, SLICE);
+    if (num_read < 0) {
+#ifdef _WIN32
+      fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
+#else
       if (errno == EAGAIN || errno == EINTR) {
         continue;
       }
       fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
+#endif
       fflush(stderr);
       goto print_and_exit;
     }
-    if (read == 0) {
+    if (num_read == 0) {
       fprintf(stderr, "EOF\n");
       fflush(stderr);
       goto print_and_exit;
     }
-    assert(read <= SLICE);
-    written = PWRITE_FUNC(ofd, p_buffer, read, last_read);
-    if (written < 0) {
+    assert(num_read <= SLICE);
+    num_written = WRITE_FUNC(ofd, p_buffer, num_read);
+    if (num_written < 0) {
+#ifdef _WIN32
+      fprintf(stderr, "Failed to write file %ws: %ws\n", output_name, wGetLastErrorMessage());
+#else
       if (errno == EAGAIN || errno == EINTR) {
         continue;
       }
       fprintf(stderr, "Failed to write file %s: %s\n", output_name, strerror(errno));
+#endif
       fflush(stderr);
       goto print_and_exit;
     }
-    if (written != read) {
-      fprintf(stderr, "Partial written %6d bytes, expected %6d bytes\n", written, read);
+    if (num_written != num_read) {
+      fprintf(stderr, "Partial written %6d bytes, expected %6d bytes\n", num_written, num_read);
       fflush(stderr);
       goto print_and_exit;
     }
-    last_read += read;
+    last_read += num_read;
   }
 
   /* FreeBSD blesses you */
@@ -224,29 +351,43 @@ nice_clean_up:
   free(p_buffer);
 
 #ifndef __linux__
+#ifdef _WIN32
+  if (FlushFileBuffers(ofd) < 0) {
+    fprintf(stderr, "Failed to sync file (output) to disk %ws: %ws\n", output_name, wGetLastErrorMessage());
+#else
   if (fsync(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
+#endif
     fflush(stderr);
     goto print_and_exit;
   }
 #endif
 
 close_and_exit:
+#ifdef _WIN32
+  if (!CloseHandle(ofd)) {
+    CloseHandle(ifd); /* rev erse order */
+#else
   if (close(ofd) < 0) {
     close(ifd); /* rev erse order */
+#endif
     fflush(stderr);
     // we should do it silently just like usage()
     _exit(255);
     return -1;
   }
+#ifdef _WIN32
+  CloseHandle(ifd); /* rev erse order */
+#else
   close(ifd);
+#endif
   goto print_and_exit;
 
 print_and_exit:
-  if (last_read == SIZE) {
-    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)SIZE/T);
+  if (last_read == TOTAL_SIZE) {
+    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)TOTAL_SIZE/T);
   } else {
-    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)SIZE/T);
+    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)TOTAL_SIZE/T);
     fflush(stderr);
     return -1;
   }
