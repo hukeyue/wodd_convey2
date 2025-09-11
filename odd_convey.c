@@ -224,12 +224,16 @@ int main(int argc, const char* argv[]) {
     goto print_and_exit;
   }
 
+#ifdef _WIN32
+  fclose(stdin);
+#else
   /* eject when unsafe */
   if (close(STDIN_FILENO) < 0) {
     fprintf(stderr, "%s\n", "Unstable input tty console");
     fflush(stderr);
     goto print_and_exit;
   }
+#endif
 
   /* clean previous output up */
   fflush(stdout);
