@@ -54,23 +54,31 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#ifndef _WIN32
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) \
+  (__extension__({ \
+    long int __result; \
+    do __result = (long int)(expression); \
+    while(__result == -1L && errno == EINTR); \
+    __result; \
+  }))
+#endif
+#define CALL_READ(a, b, c) TEMP_FAILURE_RETRY(read(a, b, c))
+#define CALL_WRITE(a, b, c) TEMP_FAILURE_RETRY(write(a, b, c))
+#endif
+
 #ifdef __linux__
 #if __TOTAL_SIZE_WIDTH__ < 64
-#define LSEEK_FUNC(a, b, c) lseek64(a, b, c)
-#define READ_FUNC(a, b, c) read(a, b, c)
-#define WRITE_FUNC(a, b, c) write(a, b, c)
+#define CALL_LSEEK(a, b, c) TEMP_FAILURE_RETRY(lseek64(a, b, c))
 #else
-#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
-#define READ_FUNC(a, b, c) read(a, b, c)
-#define WRITE_FUNC(a, b, c) write(a, b, c)
+#define CALL_LSEEK(a, b, c) TEMP_FAILURE_RETRY(lseek(a, b, c))
 #endif // __TOTAL_SIZE_WIDTH__
 #endif // __linux__
 
 #ifdef __APPLE__
 #include <sys/types.h>
-#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
-#define READ_FUNC(a, b, c) read(a, b, c)
-#define WRITE_FUNC(a, b, c) write(a, b, c)
+#define CALL_LSEEK(a, b, c) TEMP_FAILURE_RETRY(lseek(a, b, c))
 typedef __darwin_off_t loff_t;
 #endif // __APPLE__
 
@@ -79,17 +87,25 @@ typedef __darwin_off_t loff_t;
 #ifndef _OFF64_T_DECLARED
 #error Offset (Alias) not defined
 #endif
-#define LSEEK_FUNC(a, b, c) lseek(a, b, c)
-#define READ_FUNC(a, b, c) read(a, b, c)
-#define WRITE_FUNC(a, b, c) write(a, b, c)
+#define CALL_LSEEK(a, b, c) TEMP_FAILURE_RETRY(lseek(a, b, c))
 typedef __off64_t loff_t;
 #endif // __FreeBSD__
 
 #ifdef _WIN32
 typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
-#define LSEEK_FUNC(a, b, c) ({ LARGE_INTEGER B; B.QuadPart = b; lseekInt(a, B, c); })
-#define READ_FUNC(a, b, c) readInt(a, b, c)
-#define WRITE_FUNC(a, b, c) writeInt(a, b, c)
+#define CALL_LSEEK(a, b, c) ({ LARGE_INTEGER B; B.QuadPart = b; lseekInt(a, B, c); })
+#define CALL_READ(a, b, c) ({ \
+  DWORD bytesRead; \
+  if (!ReadFile(a, b, c, &bytesRead, NULL)) \
+    bytesRead = -1; \
+  bytesRead; \
+ })
+#define CALL_WRITE(a, b, c) ({ \
+  DWORD bytesWritten; \
+  if (!WriteFile(a, b, c, &bytesWritten, NULL)) \
+    bytesWritten = -1; \
+  bytesWritten; \
+ })
 #endif
 
 #ifdef __linux__
@@ -113,6 +129,7 @@ static const wchar_t output_name[] = L"NUL";
 #else
 static const char output_name[] = "/dev/null";
 #endif
+
 static const long long K = 1ll << 10;
 static const long long M = 1ll << 20;
 static const long long G = 1ll << 30;
@@ -182,21 +199,6 @@ static int lseekInt(HANDLE hFile, LARGE_INTEGER offset, int whence) {
     return -1;
   }
   return 0;
-}
-static DWORD readInt(HANDLE hFile, void *buf, size_t nbyte) {
-  DWORD bytesRead;
-  if (!ReadFile(hFile, buf, nbyte, &bytesRead, NULL)) {
-    return -1;
-  }
-  return bytesRead;
-}
-
-static DWORD writeInt(HANDLE hFile, const void *buf, size_t nbyte) {
-  DWORD bytesWritten;
-  if (!WriteFile(hFile, buf, nbyte, &bytesWritten, NULL)) {
-    return -1;
-  }
-  return bytesWritten;
 }
 #endif
 
@@ -282,7 +284,7 @@ int main(int argc, const char* argv[]) {
 #endif
           " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
           input_name, output_name, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
-  if (LSEEK_FUNC(ifd, OFFSET, SEEK_SET) < 0) {
+  if (CALL_LSEEK(ifd, OFFSET, SEEK_SET) < 0) {
 #ifdef _WIN32
     fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
 #else
@@ -293,14 +295,11 @@ int main(int argc, const char* argv[]) {
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
     assert(SLICE <= __INT_MAX__);
-    num_read = READ_FUNC(ifd, p_buffer, SLICE);
+    num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
 #ifdef _WIN32
       fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
 #else
-      if (errno == EAGAIN || errno == EINTR) {
-        continue;
-      }
       fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
 #endif
       fflush(stderr);
@@ -312,14 +311,11 @@ int main(int argc, const char* argv[]) {
       goto print_and_exit;
     }
     assert(num_read <= SLICE);
-    num_written = WRITE_FUNC(ofd, p_buffer, num_read);
+    num_written = CALL_WRITE(ofd, p_buffer, num_read);
     if (num_written < 0) {
 #ifdef _WIN32
       fprintf(stderr, "Failed to write file %ws: %ws\n", output_name, wGetLastErrorMessage());
 #else
-      if (errno == EAGAIN || errno == EINTR) {
-        continue;
-      }
       fprintf(stderr, "Failed to write file %s: %s\n", output_name, strerror(errno));
 #endif
       fflush(stderr);
