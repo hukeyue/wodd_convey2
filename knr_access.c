@@ -57,7 +57,8 @@ void usage(exec_name)
 #endif
 
 #ifdef _WIN32
-const wchar_t* wGetLastErrorMessage() {
+const wchar_t* wGetLastErrorMessage()
+{
   DWORD errorCode = GetLastError();
   static WCHAR buffer[64 << 10];
 
