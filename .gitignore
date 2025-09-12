@@ -13,3 +13,4 @@ knr_access64
 *.swp
 *.exe
 /build
+/build-*
