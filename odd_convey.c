@@ -53,6 +53,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 
 #ifndef _WIN32
 #ifndef TEMP_FAILURE_RETRY
@@ -66,6 +67,7 @@
 #endif
 #define CALL_READ(a, b, c) TEMP_FAILURE_RETRY(read(a, b, c))
 #define CALL_WRITE(a, b, c) TEMP_FAILURE_RETRY(write(a, b, c))
+#define CALL_FLUSH(a) TEMP_FAILURE_RETRY(fsync(a))
 #endif
 
 #ifdef __linux__
@@ -112,6 +114,10 @@ typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
     if (!WriteFile(a, b, c, &bytesWritten, NULL)) \
       bytesWritten = -1; \
     bytesWritten; \
+  }))
+#define CALL_FLUSH(a) \
+  (__extension__({ \
+    FlushFileBuffers(a) ? 0 : -1; \
   }))
 #endif
 
@@ -366,11 +372,10 @@ nice_clean_up:
   free(p_buffer);
 
 #ifndef __linux__
+  if (CALL_FLUSH(ofd) < 0) {
 #ifdef _WIN32
-  if (FlushFileBuffers(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %ws: %ws\n", output_name, wGetLastErrorMessage());
 #else
-  if (fsync(ofd) < 0) {
     fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
 #endif
     fflush(stderr);
@@ -392,7 +397,7 @@ close_and_exit:
     return -1;
   }
 #ifdef _WIN32
-  CloseHandle(ifd); /* rev erse order */
+  CloseHandle(ifd);
 #else
   close(ifd);
 #endif
