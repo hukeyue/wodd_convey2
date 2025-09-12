@@ -93,19 +93,26 @@ typedef __off64_t loff_t;
 
 #ifdef _WIN32
 typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
-#define CALL_LSEEK(a, b, c) ({ LARGE_INTEGER B; B.QuadPart = b; lseekInt(a, B, c); })
-#define CALL_READ(a, b, c) ({ \
-  DWORD bytesRead; \
-  if (!ReadFile(a, b, c, &bytesRead, NULL)) \
-    bytesRead = -1; \
-  bytesRead; \
- })
-#define CALL_WRITE(a, b, c) ({ \
-  DWORD bytesWritten; \
-  if (!WriteFile(a, b, c, &bytesWritten, NULL)) \
-    bytesWritten = -1; \
-  bytesWritten; \
- })
+#define CALL_LSEEK(a, b, c) \
+  (__extension__({ \
+    LARGE_INTEGER B; \
+    B.QuadPart = b; \
+    lseekInt(a, B, c); \
+  }))
+#define CALL_READ(a, b, c) \
+  (__extension__({ \
+    DWORD bytesRead; \
+    if (!ReadFile(a, b, c, &bytesRead, NULL)) \
+      bytesRead = -1; \
+    bytesRead; \
+  }))
+#define CALL_WRITE(a, b, c) \
+  (__extension__({ \
+    DWORD bytesWritten; \
+    if (!WriteFile(a, b, c, &bytesWritten, NULL)) \
+      bytesWritten = -1; \
+    bytesWritten; \
+  }))
 #endif
 
 #ifdef __linux__
@@ -130,13 +137,21 @@ static const wchar_t output_name[] = L"NUL";
 static const char output_name[] = "/dev/null";
 #endif
 
-static const long long K = 1ll << 10;
-static const long long M = 1ll << 20;
-static const long long G = 1ll << 30;
-static const long long T = 1ll << 40;
-static const loff_t OFFSET = 12 * T;
-static const loff_t TOTAL_SIZE = 16 * T;
-static const long SLICE = 8 * M;
+#define K             (1ull << 10)
+#define M             (1ull << 20)
+#define G             (1ull << 30)
+#define T             (1ull << 40)
+#define OFFSET        (12ull * T)
+#define TOTAL_SIZE    (16ull * T)
+#define SLICE         (8ul * M)
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#define likely(x)     (x)
+#define unlikely(x)   (x)
+#else
+#define likely(x)     __builtin_expect(!!(x), 1)
+#define unlikely(x)   __builtin_expect(!!(x), 0)
+#endif
 
 /* hold in-place */
 #ifdef _WIN32
@@ -154,7 +169,7 @@ static void usage(const char* p_name, intptr_t unused_parameter) {
 #endif
 
 static void dot(loff_t *last_seen, loff_t last_read) {
-  if (/*unlikely*/ __builtin_expect(last_read == TOTAL_SIZE, 0)) {
+  if (unlikely(last_read == TOTAL_SIZE)) {
     fprintf(stdout, "Progress 100 over 100 percent (STAR)\n");
     *last_seen = last_read;
     fflush(stdout); /* fsync on last dot */
