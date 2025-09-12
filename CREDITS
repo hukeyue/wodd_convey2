@@ -4,3 +4,6 @@ The fsync() function call appeared in 4.2BSD.
 The sendfile() system call first appeared in Darwin 9.0.
 A write() function call appeared in Version 6 AT&T UNIX.
 The lseek() function appeared in Version 7 AT&T UNIX.
+SetFilePointerEx function (fileapi.h) 07/27/2022.
+CreateFileA function (fileapi.h) 02/09/2023.
+GetFileAttributesW function (fileapi.h) 06/02/2023.
