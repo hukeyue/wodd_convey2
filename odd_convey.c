@@ -313,7 +313,7 @@ int main(int argc, const char* argv[]) {
     goto print_and_exit;
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
-    assert(SLICE <= __INT_MAX__);
+    assert(SLICE <= INT_MAX);
     num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
 #ifdef _WIN32
