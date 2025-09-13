@@ -25,6 +25,7 @@ include(CheckLibraryExists)
 
 if (WIN32)
   add_definitions(-D_WIN32)
+  add_definitions(-D_USING_V110_SDK71_)
   add_definitions(-D_WIN32_WINNT=0x0501)
   add_definitions(-DWINVER=0x0501)
   add_definitions(-DNOMINMAX)
