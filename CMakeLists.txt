@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0)
+cmake_minimum_required(VERSION 3.13)
 
 if (CMAKE_CURRENT_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   message(FATAL_ERROR "Dummy build is not support")
@@ -97,9 +97,8 @@ endif()
 add_executable(access access.c)
 add_executable(knr_access knr_access.c)
 add_executable(odd_convey odd_convey.c)
+
+### POST STAGE (Linkage)
 if (WIN32)
   link_libraries(shell32 kernel32)
 endif()
-
-### POST STAGE (Linkage)
-# stale

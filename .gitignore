@@ -14,3 +14,7 @@ knr_access64
 *.exe
 /build
 /build-*
+/out
+CMakeSettings.json
+*.pyc
+__pycache__
