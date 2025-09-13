@@ -99,6 +99,22 @@ add_executable(knr_access knr_access.c)
 add_executable(odd_convey odd_convey.c)
 
 ### POST STAGE (Linkage)
+# FIXME we simply import manifest from file as we haven't built llvm with libxml2
+if (MSVC)
+  target_link_options(access PRIVATE /MANIFEST:NO)
+  target_link_options(knr_access PRIVATE /MANIFEST:NO)
+  target_link_options(odd_convey PRIVATE /MANIFEST:NO)
+  target_sources(access PRIVATE win32.rc)
+  target_sources(knr_access PRIVATE win32.rc)
+  target_sources(odd_convey PRIVATE win32.rc)
+endif()
+
+if (MINGW)
+  target_sources(access PRIVATE win32.rc)
+  target_sources(knr_access PRIVATE win32.rc)
+  target_sources(odd_convey PRIVATE win32.rc)
+endif()
+
 if (WIN32)
   link_libraries(shell32 kernel32)
 endif()
