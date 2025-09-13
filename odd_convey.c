@@ -65,6 +65,18 @@
     __result; \
   }))
 #endif
+#define CALL_STDOUT_PRINTLN(format, ...) \
+  (__extension__({ \
+    fprintf(stdout, format "\n", ##__VA_ARGS__); \
+  }))
+#define CALL_STDERR_PRINTLN(format, ...) \
+  (__extension__({ \
+    fprintf(stderr, format "\n", ##__VA_ARGS__); \
+  }))
+#define CALL_STDERR_PRINTLN_WITH_ERRORS(format, ...) \
+  (__extension__({ \
+    fprintf(stderr, format ": %s\n", ##__VA_ARGS__, strerror(errno)); \
+  }))
 #define CALL_READ(a, b, c) TEMP_FAILURE_RETRY(read(a, b, c))
 #define CALL_WRITE(a, b, c) TEMP_FAILURE_RETRY(write(a, b, c))
 #define CALL_FLUSH(a) TEMP_FAILURE_RETRY(fsync(a))
@@ -95,6 +107,24 @@ typedef __off64_t loff_t;
 
 #ifdef _WIN32
 typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
+#define CALL_STDOUT_PRINTLN(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L"\n", ##__VA_ARGS__); \
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, NULL, NULL); \
+  }))
+#define CALL_STDERR_PRINTLN(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L"\n", ##__VA_ARGS__); \
+    WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), buffer, len, NULL, NULL); \
+  }))
+#define CALL_STDERR_PRINTLN_WITH_ERRORS(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L": %s\n", ##__VA_ARGS__, wGetLastErrorMessage()); \
+    WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), buffer, len, NULL, NULL); \
+  }))
 #define CALL_LSEEK(a, b, c) \
   (__extension__({ \
     LARGE_INTEGER B; \
@@ -162,25 +192,20 @@ static const char output_name[] = "/dev/null";
 /* hold in-place */
 #ifdef _WIN32
 static void usage(const wchar_t* p_name, intptr_t unused_parameter) {
-  fprintf(stderr, "%ws <in-place> <usage>\n", p_name);
-  fflush(stderr);
-  (void)unused_parameter;
-}
 #else
 static void usage(const char* p_name, intptr_t unused_parameter) {
-  fprintf(stderr, "%s <in-place> <usage>\n", p_name);
-  fflush(stderr);
+#endif
+  CALL_STDERR_PRINTLN("%s <in-place> <usage>", p_name);
   (void)unused_parameter;
 }
-#endif
 
 static void dot(loff_t *last_seen, loff_t last_read) {
   if (unlikely(last_read == TOTAL_SIZE)) {
-    fprintf(stdout, "Progress 100 over 100 percent (STAR)\n");
+    CALL_STDOUT_PRINTLN("Progress 100 over 100 percent (STAR)");
     *last_seen = last_read;
     fflush(stdout); /* fsync on last dot */
   } else if (/*guess*/ last_read - *last_seen >= TOTAL_SIZE / 100) {
-    fprintf(stdout, "Progress %lld/100 percent\n", (long long)last_read * 100 / TOTAL_SIZE);
+    CALL_STDOUT_PRINTLN("Progress %lld/100 percent", (long long)last_read * 100 / TOTAL_SIZE);
     *last_seen = last_read;
   }
 }
@@ -250,8 +275,7 @@ int main(int argc, const char* argv[]) {
 #else
   /* eject when unsafe */
   if (close(STDIN_FILENO) < 0) {
-    fprintf(stderr, "%s\n", "Unstable input tty console");
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Unstable input tty console");
     goto print_and_exit;
   }
 #endif
@@ -265,25 +289,21 @@ int main(int argc, const char* argv[]) {
 #ifdef _WIN32
   HANDLE ifd = CreateFileW(input_name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (ifd == INVALID_HANDLE_VALUE) {
-    fprintf(stderr, "Failed to open file (input) %ws: %ws\n", input_name, wGetLastErrorMessage());
 #else
   int ifd = open(input_name, O_RDONLY, 0);
   if (ifd < 0) {
-    fprintf(stderr, "Failed to open file (input) %s: %s\n", input_name, strerror(errno));
 #endif
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (input) %s", input_name);
     goto print_and_exit;
   }
 #ifdef _WIN32
   HANDLE ofd = CreateFileW(output_name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (ofd == INVALID_HANDLE_VALUE) {
-    fprintf(stderr, "Failed to open file (output) %ws: %ws\n", output_name, wGetLastErrorMessage());
 #else
   int ofd = open(output_name, O_WRONLY, 0);
   if (ofd < 0) {
-    fprintf(stderr, "Failed to open file (output) %s: %s\n", output_name, strerror(errno));
 #endif
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (output) %s", output_name);
     goto print_and_exit;
   }
 
@@ -301,54 +321,32 @@ int main(int argc, const char* argv[]) {
   srandom(*(int*)&p_buffer[SLICE]); // TODO: RtlGenRandom:SystemFunction036
 #endif
   memset(p_buffer, rand(), SLICE);
-  fprintf(stdout, "Initialized memory convey "
-#ifdef _WIN32
-          "from %ws to %ws,"
-#else
-          "from %s to %s,"
-#endif
-          " skip %ld TiB, total size %ld TiB, slice %ld MiB\n",
+  CALL_STDOUT_PRINTLN("Initialized memory convey from %s to %s,"
+          " skip %ld TiB, total size %ld TiB, slice %ld MiB",
           input_name, output_name, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
   if (CALL_LSEEK(ifd, OFFSET, SEEK_SET) < 0) {
-#ifdef _WIN32
-    fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
-#else
-    fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
-#endif
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", input_name);
     goto print_and_exit;
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
     assert(SLICE <= INT_MAX);
     num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
-#ifdef _WIN32
-      fprintf(stderr, "Failed to read file %ws: %ws\n", input_name, wGetLastErrorMessage());
-#else
-      fprintf(stderr, "Failed to read file %s: %s\n", input_name, strerror(errno));
-#endif
-      fflush(stderr);
+      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", input_name);
       goto print_and_exit;
     }
     if (num_read == 0) {
-      fprintf(stderr, "EOF\n");
-      fflush(stderr);
+      CALL_STDERR_PRINTLN("EOF");
       goto print_and_exit;
     }
     assert(num_read <= SLICE);
     num_written = CALL_WRITE(ofd, p_buffer, num_read);
     if (num_written < 0) {
-#ifdef _WIN32
-      fprintf(stderr, "Failed to write file %ws: %ws\n", output_name, wGetLastErrorMessage());
-#else
-      fprintf(stderr, "Failed to write file %s: %s\n", output_name, strerror(errno));
-#endif
-      fflush(stderr);
+      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to write file %s", output_name);
       goto print_and_exit;
     }
     if (num_written != num_read) {
-      fprintf(stderr, "Partial written %6d bytes, expected %6d bytes\n", num_written, num_read);
-      fflush(stderr);
+      CALL_STDERR_PRINTLN("Partial written %6d bytes, expected %6d bytes", num_written, num_read);
       goto print_and_exit;
     }
     last_read += num_read;
@@ -373,12 +371,7 @@ nice_clean_up:
 
 #ifndef __linux__
   if (CALL_FLUSH(ofd) < 0) {
-#ifdef _WIN32
-    fprintf(stderr, "Failed to sync file (output) to disk %ws: %ws\n", output_name, wGetLastErrorMessage());
-#else
-    fprintf(stderr, "Failed to sync file (output) to disk %s: %s\n", output_name, strerror(errno));
-#endif
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to sync file (output) to disk %s", output_name);
     goto print_and_exit;
   }
 #endif
@@ -391,7 +384,7 @@ close_and_exit:
   if (close(ofd) < 0) {
     close(ifd); /* rev erse order */
 #endif
-    fflush(stderr);
+    fflush(stdout);
     // we should do it silently just like usage()
     _exit(255);
     return -1;
@@ -405,10 +398,9 @@ close_and_exit:
 
 print_and_exit:
   if (last_read == TOTAL_SIZE) {
-    fprintf(stdout, "Successfully written %3.4lf TiB\n", (double)TOTAL_SIZE/T);
+    CALL_STDOUT_PRINTLN("Successfully written %3.4lf TiB", (double)TOTAL_SIZE/T);
   } else {
-    fprintf(stderr, "Written %2.4lf TiB, expected %1.5lf TiB\n", (double)last_read/T, (double)TOTAL_SIZE/T);
-    fflush(stderr);
+    CALL_STDERR_PRINTLN("Written %2.4lf TiB, expected %1.5lf TiB", (double)last_read/T, (double)TOTAL_SIZE/T);
     return -1;
   }
 }

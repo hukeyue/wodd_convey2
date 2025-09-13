@@ -39,22 +39,54 @@
 #endif
 #include <assert.h>
 
+#ifdef _WIN32
+#define CALL_STDOUT_PRINTLN(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L"\n", ##__VA_ARGS__); \
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buffer, len, NULL, NULL); \
+  }))
+#define CALL_STDERR_PRINTLN(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L"\n", ##__VA_ARGS__); \
+    WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), buffer, len, NULL, NULL); \
+  }))
+#define CALL_STDERR_PRINTLN_WITH_ERRORS(format, ...) \
+  (__extension__({ \
+    wchar_t buffer[4096]; \
+    int len = _snwprintf(buffer, sizeof(buffer)/sizeof(buffer[0]), L ## format L" due to '%s'\n", ##__VA_ARGS__, wGetLastErrorMessage()); \
+    WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), buffer, len, NULL, NULL); \
+  }))
+#else
+#define CALL_STDOUT_PRINTLN(format, ...) \
+  (__extension__({ \
+    fprintf(stdout, format "\n", ##__VA_ARGS__); \
+  }))
+#define CALL_STDERR_PRINTLN(format, ...) \
+  (__extension__({ \
+    fprintf(stderr, format "\n", ##__VA_ARGS__); \
+  }))
+#define CALL_STDERR_PRINTLN_WITH_GNU_ERRORS(format, ...) \
+  (__extension__({ \
+    fprintf(stderr, format " due to the fact that GNU extensions encountered ERROR: '%s'\n", ##__VA_ARGS__, strerror_g(errno)); \
+  }))
+#define CALL_STDERR_PRINTLN_WITH_ERRORS(format, ...) \
+  (__extension__({ \
+    fprintf(stderr, format " due to '%s'\n", ##__VA_ARGS__, strerror(errno)); \
+  }))
+#endif
+
 void usage(exec_name)
 #ifdef _WIN32
   const wchar_t* exec_name;
-{
-  fprintf(stderr, "%ws Usage: access <file path>\n", exec_name);
-  fflush(stderr);
-  _exit(-2);
-}
 #else
   const char* exec_name;
+#endif
 {
-  fprintf(stderr, "%s Usage: access <file path>", exec_name);
-  fflush(stderr);
+  CALL_STDERR_PRINTLN("%s Usage: access <file path>", exec_name);
   _exit(-2);
 }
-#endif
 
 #ifdef _WIN32
 const wchar_t* wGetLastErrorMessage()
@@ -124,37 +156,24 @@ int main(argc, argv)
   (void)&tmp;
 #ifdef _WIN32
   if (tmp == INVALID_FILE_ATTRIBUTES) {
-    fprintf(stderr, "Not accessible '%ws' due to '%ws'\n", argv[1], wGetLastErrorMessage());
-    fflush(stderr);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Not accessible '%s'", argv[1]);
     goto done;
-  } else if (tmp & FILE_ATTRIBUTE_DIRECTORY) {
-    fprintf(stdout, "READ Permission OK on directory '%ws'\n", argv[1]);
-  } else if (tmp & FILE_ATTRIBUTE_NORMAL) {
-    fprintf(stdout, "READ Permission OK on normal file '%ws'\n", argv[1]);
-  } else if (tmp & FILE_ATTRIBUTE_SYSTEM) {
-    fprintf(stdout, "READ Permission OK on system file '%ws'\n", argv[1]);
-  } else if (tmp & FILE_ATTRIBUTE_HIDDEN) {
-    fprintf(stdout, "READ Permission OK on hidden file '%ws'\n", argv[1]);
-  } else if (tmp & FILE_ATTRIBUTE_COMPRESSED) {
-    fprintf(stdout, "READ Permission OK on compressed file '%ws'\n", argv[1]);
   } else {
-    fprintf(stdout, "READ Permission OK on file '%ws'\n", argv[1]);
+    CALL_STDOUT_PRINTLN("OK '%s'", argv[1]);
   }
   exit(0);
 done:
 #else
   switch(tmp) {
     case 0:
-      fprintf(stdout, "OK '%s'\n", argv[1]);
+      CALL_STDOUT_PRINTLN("OK '%s'", argv[1]);
       exit(0);
     break;
     case -1:
-      fprintf(stderr, "Not feasible '%s' due to the fact that"
-              " GNU extensions encountered ERROR: '%s'\n",
-              argv[1], strerror_g(errno));
+      CALL_STDERR_PRINTLN_WITH_GNU_ERRORS("Not feasible '%s'", argv[1]);
     break;
     default:
-      fprintf(stderr, "Unknown error: '%s'\n", strerror(errno));
+      CALL_STDERR_PRINTLN_WITH_ERRORS("Unknown error");
     break;
   }
 #endif
