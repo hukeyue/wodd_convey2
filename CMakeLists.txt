@@ -5,6 +5,15 @@ if (CMAKE_CURRENT_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 
 ## ESCALASTION
+# Select the MSVC runtime library for use by compilers targeting the MSVC ABI.
+#
+# Introduced by cmake 3.15
+# https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html#variable:CMAKE_MSVC_RUNTIME_LIBRARY
+# and https://cmake.org/cmake/help/latest/policy/CMP0091.html
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+
 ## ESCAPE
 ## KEY INVALID -- SERIAL NUMBER CALLED -- STALL
 
@@ -24,6 +33,13 @@ include(CheckLibraryExists)
 ### WIN32 Platform Specific (preprocessor)
 
 if (WIN32)
+  ## definitions FOR CRT
+  add_definitions(-D__STD_C)
+  add_definitions(-D_CRT_RAND_S)
+  add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+  add_definitions(-D_SCL_SECURE_NO_DEPRECATE)
+
+  ## definitions FOR Windows SDK
   add_definitions(-D_WIN32)
   add_definitions(-D_USING_V110_SDK71_)
   add_definitions(-D_WIN32_WINNT=0x0501)

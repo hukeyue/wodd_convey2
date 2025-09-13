@@ -1,6 +1,8 @@
 #!/bin/bash
-set -e
 set -x
+set -e
+PWD=$(dirname "${BASH_SOURCE[0]}")
+cd $PWD/..
 
 function xcopy_with_tag {
 tag=$1
