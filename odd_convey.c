@@ -220,6 +220,10 @@ static const wchar_t* wGetLastErrorMessage() {
     NULL, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
     buffer, sizeof(buffer)/sizeof(buffer[0]), NULL);
 
+  while (result && iswspace(buffer[result-1])) {
+    buffer[--result] = L'\0';
+  }
+
   if (result == 0) {
     return L"Failed to get error message";
   }
