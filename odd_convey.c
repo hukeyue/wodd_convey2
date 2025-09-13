@@ -152,25 +152,25 @@ typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
 #endif
 
 #ifdef __linux__
-static const char input_name[] = "/proc/kcore";
-// static const char input_name[] = "/dev/zero";
+#define INPUT_NAME "/proc/kcore"
+// #define INPUT_NAME "/dev/zero"
 #endif
 #ifdef __APPLE__
-static const char input_name[] = "/dev/zero";
+#define INPUT_NAME "/dev/zero"
 #endif
 
 #ifdef __FreeBSD__
-static const char input_name[] = "/dev/zero";
+#define INPUT_NAME "/dev/zero"
 #endif
 
 #ifdef _WIN32
-static const wchar_t input_name[] = L"NUL";
+#define INPUT_NAME L"NUL"
 #endif
 
 #ifdef _WIN32
-static const wchar_t output_name[] = L"NUL";
+#define OUTPUT_NAME L"NUL"
 #else
-static const char output_name[] = "/dev/null";
+#define OUTPUT_NAME "/dev/null"
 #endif
 
 #define K             (1ull << 10)
@@ -287,23 +287,23 @@ int main(int argc, const char* argv[]) {
   srand((int)(intptr_t)prog_name);
 
 #ifdef _WIN32
-  HANDLE ifd = CreateFileW(input_name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE ifd = CreateFileW(INPUT_NAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (ifd == INVALID_HANDLE_VALUE) {
 #else
-  int ifd = open(input_name, O_RDONLY, 0);
+  int ifd = open(INPUT_NAME, O_RDONLY, 0);
   if (ifd < 0) {
 #endif
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (input) %s", input_name);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (input) %s", INPUT_NAME);
     goto print_and_exit;
   }
 #ifdef _WIN32
-  HANDLE ofd = CreateFileW(output_name, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE ofd = CreateFileW(OUTPUT_NAME, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (ofd == INVALID_HANDLE_VALUE) {
 #else
-  int ofd = open(output_name, O_WRONLY, 0);
+  int ofd = open(OUTPUT_NAME, O_WRONLY, 0);
   if (ofd < 0) {
 #endif
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (output) %s", output_name);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (output) %s", OUTPUT_NAME);
     goto print_and_exit;
   }
 
@@ -323,16 +323,16 @@ int main(int argc, const char* argv[]) {
   memset(p_buffer, rand(), SLICE);
   CALL_STDOUT_PRINTLN("Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB",
-          input_name, output_name, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
+          INPUT_NAME, OUTPUT_NAME, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
   if (CALL_LSEEK(ifd, OFFSET, SEEK_SET) < 0) {
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", input_name);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", INPUT_NAME);
     goto print_and_exit;
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
     assert(SLICE <= INT_MAX);
     num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
-      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", input_name);
+      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", INPUT_NAME);
       goto print_and_exit;
     }
     if (num_read == 0) {
@@ -342,7 +342,7 @@ int main(int argc, const char* argv[]) {
     assert(num_read <= SLICE);
     num_written = CALL_WRITE(ofd, p_buffer, num_read);
     if (num_written < 0) {
-      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to write file %s", output_name);
+      CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to write file %s", OUTPUT_NAME);
       goto print_and_exit;
     }
     if (num_written != num_read) {
@@ -371,7 +371,7 @@ nice_clean_up:
 
 #ifndef __linux__
   if (CALL_FLUSH(ofd) < 0) {
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to sync file (output) to disk %s", output_name);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to sync file (output) to disk %s", OUTPUT_NAME);
     goto print_and_exit;
   }
 #endif
