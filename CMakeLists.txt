@@ -94,15 +94,54 @@ endif()
 
 ### INITIALIZATION (COFF)
 
-include(CheckLibraryExists)
 if (WIN32)
-  check_library_exists(shell32 CloseHandle "" HAVE_WIN32_CLOSE_HANDLE)
-  check_library_exists(shell32 ReadFile "" HAVE_WIN32_READ_FILE)
-  check_library_exists(shell32 WriteFile "" HAVE_WIN32_WRITE_FILE)
-  check_library_exists(shell32 CreateFileW "" HAVE_WIN32_CREATE_FILE_W)
-  check_library_exists(shell32 SetFilePointerEx "" HAVE_WIN32_SET_FILE_POINTER_EX)
-  check_library_exists(shell32 FlushFileBuffers "" HAVE_WIN32_FLUSH_FILE_BUFFERS)
+  include(CheckCSourceCompiles)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  CloseHandle(INVALID_HANDLE_VALUE);
+}
+" HAVE_WIN32_CLOSE_HANDLE)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  ReadFile(INVALID_HANDLE_VALUE, NULL, 0, NULL, NULL);
+}
+" HAVE_WIN32_READ_FILE)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  WriteFile(INVALID_HANDLE_VALUE, NULL, 0, NULL, NULL);
+}
+" HAVE_WIN32_WRITE_FILE)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  CreateFileW(L\"NUL\", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+}
+" HAVE_WIN32_CREATE_FILE_W)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  LARGE_INTEGER d;
+  d.QuadPart = 0;
+  SetFilePointerEx(INVALID_HANDLE_VALUE, d, NULL, FILE_BEGIN);
+}
+" HAVE_WIN32_SET_FILE_POINTER_EX)
+
+  check_c_source_compiles ("
+#include <windows.h>
+int main() {
+  FlushFileBuffers(INVALID_HANDLE_VALUE);
+}
+" HAVE_WIN32_FLUSH_FILE_BUFFERS)
 else()
+  include(CheckLibraryExists)
   check_library_exists(c lseek "" HAVE_LSEEK)
   check_library_exists(c lseek64 "" HAVE_LSEEK64)
   check_library_exists(c read "" HAVE_READ)
