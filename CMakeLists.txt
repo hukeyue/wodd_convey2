@@ -155,8 +155,14 @@ add_executable(knr_access knr_access.c)
 add_executable(odd_convey odd_convey.c)
 
 ### POST STAGE (Linkage)
-# FIXME we simply import manifest from file as we haven't built llvm with libxml2
-if (MSVC)
+if (MSVC AND NOT CMAKE_CROSSCOMPILING)
+  target_sources(access PRIVATE win32.manifest)
+  target_sources(knr_access PRIVATE win32.manifest)
+  target_sources(odd_convey PRIVATE win32.manifest)
+elseif (MSVC AND CMAKE_CROSSCOMPILING)
+  # FIXME we simply import manifest from file as we don't provide prebuilt llvm binaries with libxml2 support
+  # Remove this once we update llvm-builder repo in the future
+  message(WARNING "Workaround with missing llvm-mt support (mainly, libxml2) in the routine of cross-compiling is applied forcely.")
   target_link_options(access PRIVATE /MANIFEST:NO)
   target_link_options(knr_access PRIVATE /MANIFEST:NO)
   target_link_options(odd_convey PRIVATE /MANIFEST:NO)

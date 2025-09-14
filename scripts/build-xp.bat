@@ -36,14 +36,22 @@ set VSCMD_ARG_TGT_ARCH=x86
 
 call "%~dp0callxp-%Platform%.cmd"
 
-del /s /q build-xp
-md build-xp
-cd build-xp
 set CC=clang-cl
-cmake -DCMAKE_C_COMPILER_TARGET=i686-pc-windows-msvc -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_BUILD_TYPE=Release -G Ninja ..
+set CONFIG=Release
+
+rmdir /s /q build-xp
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
+md build-xp
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
+cd build-xp
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
+cmake -DCMAKE_C_COMPILER_TARGET=i686-pc-windows-msvc -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_BUILD_TYPE=%CONFIG% -G Ninja ..
 if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
 ninja
 if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
 copy /b /y access.exe ..\access-xp.exe
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
 copy /b /y knr_access.exe ..\knr_access-xp.exe
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
 copy /b /y odd_convey.exe ..\odd_convey-xp.exe
+if %ERRORLEVEL% NEQ 0 exit /B %ERRORLEVEL%
