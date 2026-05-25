@@ -19,6 +19,7 @@ endif()
 
 project(wodd_convey VERSION 2.04 LANGUAGES C)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_C_STANDARD 11)
 
 ### SANITIY CHECK AFTER BOOT (AMI)
 
@@ -41,9 +42,8 @@ if (WIN32)
 
   ## definitions FOR Windows SDK
   add_definitions(-D_WIN32)
-  add_definitions(-D_USING_V110_SDK71_)
-  add_definitions(-D_WIN32_WINNT=0x0501)
-  add_definitions(-DWINVER=0x0501)
+  add_definitions(-D_WIN32_WINNT=0x0A00)
+  add_definitions(-DWINVER=0x0A00)
   add_definitions(-DNOMINMAX)
   add_definitions(-D_UNICODE)
   add_definitions(-DUNICODE)
@@ -52,7 +52,7 @@ if (WIN32)
     add_link_options(/DYNAMICBASE /NXCOMPAT)
   endif()
 
-  set(SUBSYSTEM_VERSION_SUFFIX ",5.01")
+  set(SUBSYSTEM_VERSION_SUFFIX ",6.00")
   if (MSVC)
     set(CMAKE_C_CREATE_WIN32_EXE "/subsystem:windows${SUBSYSTEM_VERSION_SUFFIX}")
     set(CMAKE_CXX_CREATE_WIN32_EXE "/subsystem:windows${SUBSYSTEM_VERSION_SUFFIX}")
