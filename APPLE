@@ -1,5 +1,0 @@
-knr_access.c:37:5: warning: a function definition without a prototype is deprecated in all versions of C and is not supported in C23 [-Wdeprecated-non-prototype]
-   37 | int main(argc, argv)
-      |     ^
-3 warnings generated.
-cc -o odd_convey odd_convey.c
