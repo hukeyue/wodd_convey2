@@ -67,14 +67,56 @@ if (WIN32)
 endif()
 
 if (MSVC)
+  # Enable function-level linking.
+  add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/Gy>)
+
+  # Preserve previous PDB behavior.
+  add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/FS>)
+
   # Some of our files are bigger than the regular limits.
   add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>)
 
   ## Set Source and Excutable character sets to UTF-8
   add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>)
 
-  # lld's uac manifest is outdated and incompatible with windows xp
-  add_link_options(/MANIFESTUAC:NO)
+  if (CMAKE_LINKER MATCHES "lld")
+    # lld's uac manifest is outdated and incompatible with windows xp
+    add_link_options(/MANIFESTUAC:NO)
+  endif()
+
+  ## not omit stack frame pointer
+  add_compile_options($<$<AND:$<CONFIG:RELEASE>,$<COMPILE_LANGUAGE:C,CXX>>:/Oy->)
+
+  ## Generate debug info, Debug information in the .obj files for clang.
+  ## Produce PDB file for msvc, no edit and continue.
+  if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    # Debug information in the .obj files.
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/Z7>)
+
+    ## To generate PDB files for debugging with MSVC, you can use the /Z7 option.
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+      string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+      string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+      string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+      string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+      string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+      string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL}")
+      string(REPLACE "/Zi" "/Z7" CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL}")
+    endif()
+  endif()
+
+  # Turn this on to use ghash feature of lld for faster debug link on Windows.
+  # http://blog.llvm.org/2018/01/improving-link-time-on-windows-with.html
+  if (CMAKE_LINKER MATCHES "lld")
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-gcodeview-ghash>)
+    add_link_options(/DEBUG:GHASH)
+  else()
+    add_link_options(/DEBUG)
+  endif()
 endif()
 
 if (MINGW)
