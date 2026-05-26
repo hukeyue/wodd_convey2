@@ -1,0 +1,71 @@
+// Copyright (c) 2005-2025 Intel Corporation
+// Copyright (c) 2026 UXL Foundation Contributors
+// Copyright (c) 2026 Chilledheart
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Includes
+//
+#include <winresrc.h>
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#ifdef _WIN32
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+#pragma code_page(1252)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+#define TBB_VERNUMBERS 2,0,4
+#define TBB_VERSION "2.0.4"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION TBB_VERNUMBERS
+ PRODUCTVERSION TBB_VERNUMBERS
+ FILEFLAGSMASK 0x17L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "000004b0"
+        BEGIN
+            VALUE "CompanyName", "Chilledheart\0"
+            VALUE "FileDescription", "wodd_convey2\0"
+            VALUE "FileVersion", TBB_VERSION "\0"
+            VALUE "LegalCopyright", L"\x00A9 2026 Chilledheart\0"
+            VALUE "LegalTrademarks", "\0"
+            VALUE "OriginalFilename", "wodd_convey2.exe\0"
+            VALUE "ProductName", "wodd_convey2\0"
+            VALUE "ProductVersion", TBB_VERSION "\0"
+            VALUE "PrivateBuild", "\0"
+            VALUE "SpecialBuild", "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0, 1200
+    END
+END

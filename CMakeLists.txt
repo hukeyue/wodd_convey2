@@ -168,5 +168,9 @@ if (MINGW)
 endif()
 
 if (WIN32)
+  target_sources(access PRIVATE win32_version.rc)
+  target_sources(knr_access PRIVATE win32_version.rc)
+  target_sources(odd_convey PRIVATE win32_version.rc)
+
   link_libraries(shell32 kernel32)
 endif()
