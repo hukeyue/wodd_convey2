@@ -4,11 +4,7 @@ odd_convey32
 access*
 knr_access*
 a.out
-access32
-knr_access32
-odd_convey64
-access64
-knr_access64
+cxx_access*
 *.sh
 *.swp
 *.exe

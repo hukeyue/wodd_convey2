@@ -17,9 +17,12 @@ endif()
 ## ESCAPE
 ## KEY INVALID -- SERIAL NUMBER CALLED -- STALL
 
-project(wodd_convey VERSION 2.04 LANGUAGES C)
+project(wodd_convey VERSION 2.04 LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 ### SANITIY CHECK AFTER BOOT (AMI)
 
@@ -195,9 +198,10 @@ endif()
 add_executable(access access.c)
 add_executable(knr_access knr_access.c)
 add_executable(odd_convey odd_convey.c)
+add_executable(cxx_access cxx_access.cc)
 
 ### INCLUSION (NONAME)
-set(binaries access knr_access odd_convey)
+set(binaries access knr_access odd_convey cxx_access)
 
 ### POST STAGE (Linkage)
 foreach (binary ${binaries})
