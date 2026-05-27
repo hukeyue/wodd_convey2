@@ -32,7 +32,6 @@
 #include <unistd.h>
 #endif
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -118,18 +117,6 @@ int main(int argc, const char* argv[]) {
     fflush(stdout);
     return 0;
   }
-  std::string message = ec.message();
-#ifdef _WIN32
-  const size_t sz = 4096;
-  wchar_t buffer[sz];
-  size_t real_sz;
-  wchar_t *errMessageStr = buffer;
-  errno_t ret = mbstowcs_s(&real_sz, errMessageStr, sz, message.c_str(), message.size());
-  assert(!ret && "Error message converision failed");
-  static_cast<void>(ret);
-#else
-  const char *errMessageStr = message.c_str();
-#endif
-  CALL_STDERR_PRINTLN("%s %s", errMessageStr, argv[1]);
+  CALL_STDERR_PRINTLN("%s %s", ec.message().c_str(), argv[1]);
   return -1;
 }
