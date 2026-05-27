@@ -13,10 +13,15 @@ SYSROOT := /
 SRC_FILES := $(wildcard *.c)
 CROSS_OBJS := $(SRC_FILES:.c=-$(TARGET))
 
+CXX_SRC_FILES := $(wildcard *.cc)
+CXX_CROSS_OBJS := $(CXX_SRC_FILES:.cc=-$(TARGET))
+
 CC ?= clang
+CXX ?= clang++
 
 CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=2
-CFLAGS := $(CPPFLAGS) -O3 --target=$(TARGET) --sysroot $(SYSROOT)
+CFLAGS := $(CPPFLAGS) -O3 --target=$(TARGET) --sysroot $(SYSROOT) -std=c99
+CXXFLAGS := $(CPPFLAGS) -O3 --target=$(TARGET) --sysroot $(SYSROOT) -std=c++20
 LDFLAGS := -fuse-ld=lld
 
 ifneq ($(findstring freebsd,$(TARGET)),)
@@ -25,10 +30,13 @@ endif
 
 .PHONY: all clean
 
-all : $(CROSS_OBJS)
+all : $(CROSS_OBJS) $(CXX_CROSS_OBJS)
 
 %-$(TARGET): %.c
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
+%-$(TARGET): %.cc
+	$(CXX) -o $@ $^ $(CXXFLAGS) $(LDFLAGS)
+
 clean:
-	-rm -f $(CROSS_OBJS)
+	-rm -f $(CROSS_OBJS) $(CXX_CROSS_OBJS)
