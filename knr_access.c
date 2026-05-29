@@ -155,7 +155,7 @@ int main(argc, argv)
 #ifdef _WIN32
   tmp = GetFileAttributesW(argv[1]);
 #else
-  tmp = access(argv[1], R_OK); // TODO: GetFileAttributeW
+  tmp = access(argv[1], R_OK);
 #endif
   (void)&tmp;
 #ifdef _WIN32
