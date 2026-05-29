@@ -8,3 +8,4 @@ SetFilePointerEx function (fileapi.h) 07/27/2022.
 CreateFileA function (fileapi.h) 02/09/2023.
 GetFileAttributesW function (fileapi.h) 06/02/2023.
 The access() function appeared in Version 7 AT&T UNIX.
+An lstat() function appeared in 4.2BSD.
