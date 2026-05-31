@@ -252,6 +252,24 @@ static int lseekInt(HANDLE hFile, LARGE_INTEGER offset, int whence) {
 }
 #endif
 
+static int32_t odd_random() {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+  return arc4random(); // always succeeds
+#elif defined(__linux__)
+  int32_t result;
+  int ret = getentropy(&result, sizeof(result));
+  assert(ret == 0 && "getentropy failure");
+  return result;
+#elif defined(_WIN32)
+  int32_t result;
+  ULONG output_bytes_this_pass = sizeof(result);
+  NTSTATUS ret = BCryptGenRandom(/*hAlgorithm=*/NULL, (uint8_t*)&result, output_bytes_this_pass,
+                                 BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  assert(BCRYPT_SUCCESS(ret) && "BCryptGenRandom failure");
+  return result;
+#endif
+}
+
 #ifdef _WIN32
 int wmain(int argc, const wchar_t* argv[]) {
 #else
@@ -317,14 +335,10 @@ int main(int argc, const char* argv[]) {
     usage(prog_name, buffer);
     goto close_and_exit;
   }
-#ifdef __APPLE__
-  sranddev();
-#elif defined(__FreeBSD__)
-  srandomdev();
-#elif !defined(_WIN32)
-  srandom(*(int*)&p_buffer[SLICE]); // TODO: RtlGenRandom:SystemFunction036
-#endif
-  memset(p_buffer, rand(), SLICE);
+  for (int i = 0; i < SLICE / sizeof(int32_t); ++i) {
+    int32_t r = odd_random();
+    memcpy(p_buffer + sizeof(r) * i, &r, sizeof(r));
+  }
   CALL_STDOUT_PRINTLN("Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB",
           INPUT_NAME, OUTPUT_NAME, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));

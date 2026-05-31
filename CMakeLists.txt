@@ -215,6 +215,6 @@ foreach (binary ${binaries})
 
   if (WIN32)
     target_sources(${binary} PRIVATE win32_version.rc)
-    target_link_libraries(${binary} PRIVATE shell32 kernel32)
+    target_link_libraries(${binary} PRIVATE bcrypt shell32 kernel32)
   endif()
 endforeach()

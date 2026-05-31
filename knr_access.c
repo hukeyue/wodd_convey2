@@ -118,7 +118,7 @@ char* strerror_g(errnum)
 #ifdef __linux__
   return strerror_r(errnum, knr_buffer, sizeof(knr_buffer));
 #endif
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
   int p = strerror_r(errnum, knr_buffer, sizeof(knr_buffer));
   assert(p == 0);
   (void)&p;
