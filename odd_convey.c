@@ -44,6 +44,7 @@
 #else
 #include <unistd.h>
 #endif
+#include <signal.h>
 #include <stdio.h>
 #ifndef _WIN32
 #include <errno.h>
@@ -270,6 +271,15 @@ static int32_t odd_random() {
 #endif
 }
 
+static int exit_code = 0;
+static void signal_handler(int sig) {
+  if (sig == SIGINT)
+    exit_code = 1;
+}
+
+#define CHECK_EXIT_CODE_AND_LEAVE() \
+  do { if (exit_code) goto print_and_exit; } while(0)
+
 #ifdef _WIN32
 int wmain(int argc, const wchar_t* argv[]) {
 #else
@@ -292,6 +302,15 @@ int main(int argc, const char* argv[]) {
     goto print_and_exit;
   }
 
+  /* deal with SIGINT signal */
+  if (signal(SIGINT, signal_handler) != 0) {
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Unstable signal handler");
+    goto print_and_exit;
+  }
+
+  /* check point 0: close console input steam */
+  CHECK_EXIT_CODE_AND_LEAVE();
+
 #ifdef _WIN32
   fclose(stdin);
 #else
@@ -305,8 +324,8 @@ int main(int argc, const char* argv[]) {
   /* clean previous output up */
   fflush(stdout);
 
-  /* Initialize the rand seed prior to ifd */
-  srand((int)(intptr_t)prog_name);
+  /* check point 1: open input stream */
+  CHECK_EXIT_CODE_AND_LEAVE();
 
 #ifdef _WIN32
   HANDLE ifd = CreateFileW(INPUT_NAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -318,6 +337,10 @@ int main(int argc, const char* argv[]) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (input) %s", INPUT_NAME);
     goto print_and_exit;
   }
+
+  /* check point 2: open close stream */
+  CHECK_EXIT_CODE_AND_LEAVE();
+
 #ifdef _WIN32
   HANDLE ofd = CreateFileW(OUTPUT_NAME, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
   if (ofd == INVALID_HANDLE_VALUE) {
@@ -328,6 +351,9 @@ int main(int argc, const char* argv[]) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (output) %s", OUTPUT_NAME);
     goto print_and_exit;
   }
+
+  /* check point 3: allocate temporary buffer */
+  CHECK_EXIT_CODE_AND_LEAVE();
 
   /* Allocate the slice buffer (quite large) */
   p_buffer = malloc(SLICE + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
@@ -342,11 +368,19 @@ int main(int argc, const char* argv[]) {
   CALL_STDOUT_PRINTLN("Initialized memory convey from %s to %s,"
           " skip %ld TiB, total size %ld TiB, slice %ld MiB",
           INPUT_NAME, OUTPUT_NAME, (long)(OFFSET / T), (long)(TOTAL_SIZE / T), (long)(SLICE / M));
+
+  /* check point 4: seek input file position */
+  CHECK_EXIT_CODE_AND_LEAVE();
+
   if (CALL_LSEEK(ifd, OFFSET, SEEK_SET) < 0) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", INPUT_NAME);
     goto print_and_exit;
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
+
+    /* check point 5: do input file read operation */
+    CHECK_EXIT_CODE_AND_LEAVE();
+
     assert(SLICE <= INT_MAX);
     num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
@@ -357,6 +391,10 @@ int main(int argc, const char* argv[]) {
       CALL_STDERR_PRINTLN("EOF");
       goto print_and_exit;
     }
+
+    /* check point 6: do output file write operation */
+    CHECK_EXIT_CODE_AND_LEAVE();
+
     assert(num_read <= SLICE);
     num_written = CALL_WRITE(ofd, p_buffer, num_read);
     if (num_written < 0) {
@@ -370,22 +408,18 @@ int main(int argc, const char* argv[]) {
     last_read += num_read;
   }
 
-  /* FreeBSD blesses you */
-  if (!!!rand()) {
-    goto flush_and_exit;
-  }
-
   goto nice_clean_up;
 
 flush_and_exit:
   fflush(stdout);
 
 nice_clean_up:
-  /* DeInitialize the rand seed prior to appending on freelist */
-  srand(~0);
 
   /* Free the slice buffer (appended to freelist) */
   free(p_buffer);
+
+  /* check point 7: flush output stream */
+  CHECK_EXIT_CODE_AND_LEAVE();
 
 #ifndef __linux__
   if (CALL_FLUSH(ofd) < 0) {
@@ -397,10 +431,12 @@ nice_clean_up:
 close_and_exit:
 #ifdef _WIN32
   if (!CloseHandle(ofd)) {
-    CloseHandle(ifd); /* rev erse order */
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close (sync) output file %s", OUTPUT_NAME);
+    CloseHandle(ifd); /* in reverse order */
 #else
   if (close(ofd) < 0) {
-    close(ifd); /* rev erse order */
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close (sync) output file %s", OUTPUT_NAME);
+    close(ifd); /* in reverse order */
 #endif
     fflush(stdout);
     // we should do it silently just like usage()
