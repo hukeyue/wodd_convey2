@@ -57,6 +57,7 @@
 #include <limits.h>
 
 #ifndef _WIN32
+#define INVALID_HANDLE_VALUE (-1)
 #ifndef TEMP_FAILURE_RETRY
 #define TEMP_FAILURE_RETRY(expression) \
   (__extension__({ \
@@ -81,6 +82,7 @@
 #define CALL_READ(a, b, c) TEMP_FAILURE_RETRY(read(a, b, c))
 #define CALL_WRITE(a, b, c) TEMP_FAILURE_RETRY(write(a, b, c))
 #define CALL_FLUSH(a) TEMP_FAILURE_RETRY(fsync(a))
+#define CALL_CLOSE(a) TEMP_FAILURE_RETRY(close(a))
 #endif
 
 #ifdef __linux__
@@ -150,6 +152,10 @@ typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
   (__extension__({ \
     FlushFileBuffers(a) ? 0 : -1; \
   }))
+#define CALL_CLOSE(a) \
+  (__extension__({ \
+    CloseHandle(a) ? 0 : -1; \
+  }))
 #endif
 
 #ifdef __linux__
@@ -192,12 +198,11 @@ typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
 
 /* hold in-place */
 #ifdef _WIN32
-static void usage(const wchar_t* p_name, intptr_t unused_parameter) {
+static void usage(const wchar_t* p_name) {
 #else
-static void usage(const char* p_name, intptr_t unused_parameter) {
+static void usage(const char* p_name) {
 #endif
   CALL_STDERR_PRINTLN("%s <in-place> <usage>", p_name);
-  (void)unused_parameter;
 }
 
 static void dot(loff_t *last_seen, loff_t last_read) {
@@ -278,7 +283,10 @@ static void signal_handler(int sig) {
 }
 
 #define CHECK_EXIT_CODE_AND_LEAVE() \
-  do { if (exit_code) goto print_and_exit; } while(0)
+  do { \
+    if (unlikely(exit_code)) \
+      goto close_and_exit; \
+  } while (0)
 
 #ifdef _WIN32
 int wmain(int argc, const wchar_t* argv[]) {
@@ -292,20 +300,24 @@ int main(int argc, const char* argv[]) {
 #else
   const char* const prog_name = argv[0];
 #endif
-  int buffer = rand();
   void* p_buffer;
+#ifdef _WIN32
+  HANDLE ifd = INVALID_HANDLE_VALUE, ofd = INVALID_HANDLE_VALUE;
+#else
+  int ifd = INVALID_HANDLE_VALUE, ofd = INVALID_HANDLE_VALUE;
+#endif
 
   /* hang on --background boot */
   if (argc > 1) {
-    usage(prog_name, buffer);
+    usage(prog_name);
     fflush(stdout);
-    goto print_and_exit;
+    goto close_and_exit;
   }
 
   /* deal with SIGINT signal */
   if (signal(SIGINT, signal_handler) != 0) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Unstable signal handler");
-    goto print_and_exit;
+    goto close_and_exit;
   }
 
   /* check point 0: close console input steam */
@@ -317,7 +329,7 @@ int main(int argc, const char* argv[]) {
   /* eject when unsafe */
   if (close(STDIN_FILENO) < 0) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Unstable input tty console");
-    goto print_and_exit;
+    goto close_and_exit;
   }
 #endif
 
@@ -328,28 +340,26 @@ int main(int argc, const char* argv[]) {
   CHECK_EXIT_CODE_AND_LEAVE();
 
 #ifdef _WIN32
-  HANDLE ifd = CreateFileW(INPUT_NAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (ifd == INVALID_HANDLE_VALUE) {
+  ifd = CreateFileW(INPUT_NAME, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 #else
-  int ifd = open(INPUT_NAME, O_RDONLY, 0);
-  if (ifd < 0) {
+  ifd = open(INPUT_NAME, O_RDONLY, 0);
 #endif
+  if (ifd == INVALID_HANDLE_VALUE) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (input) %s", INPUT_NAME);
-    goto print_and_exit;
+    goto close_and_exit;
   }
 
   /* check point 2: open close stream */
   CHECK_EXIT_CODE_AND_LEAVE();
 
 #ifdef _WIN32
-  HANDLE ofd = CreateFileW(OUTPUT_NAME, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-  if (ofd == INVALID_HANDLE_VALUE) {
+  ofd = CreateFileW(OUTPUT_NAME, GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 #else
-  int ofd = open(OUTPUT_NAME, O_WRONLY, 0);
-  if (ofd < 0) {
+  ofd = open(OUTPUT_NAME, O_WRONLY, 0);
 #endif
+  if (ofd == INVALID_HANDLE_VALUE) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to open file (output) %s", OUTPUT_NAME);
-    goto print_and_exit;
+    goto close_and_exit;
   }
 
   /* check point 3: allocate temporary buffer */
@@ -358,7 +368,7 @@ int main(int argc, const char* argv[]) {
   /* Allocate the slice buffer (quite large) */
   p_buffer = malloc(SLICE + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
   if (!p_buffer) {
-    usage(prog_name, buffer);
+    usage(prog_name);
     goto close_and_exit;
   }
   for (int i = 0; i < SLICE / sizeof(int32_t); ++i) {
@@ -374,7 +384,7 @@ int main(int argc, const char* argv[]) {
 
   if (CALL_LSEEK(ifd, OFFSET, SEEK_SET) < 0) {
     CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", INPUT_NAME);
-    goto print_and_exit;
+    goto close_and_exit;
   }
   for (int num_read = 0, num_written = 0; dot(&last_seen, last_read), last_read < TOTAL_SIZE;) {
 
@@ -385,11 +395,11 @@ int main(int argc, const char* argv[]) {
     num_read = CALL_READ(ifd, p_buffer, SLICE);
     if (num_read < 0) {
       CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to read file %s", INPUT_NAME);
-      goto print_and_exit;
+      goto close_and_exit;
     }
     if (num_read == 0) {
       CALL_STDERR_PRINTLN("EOF");
-      goto print_and_exit;
+      goto close_and_exit;
     }
 
     /* check point 6: do output file write operation */
@@ -399,11 +409,11 @@ int main(int argc, const char* argv[]) {
     num_written = CALL_WRITE(ofd, p_buffer, num_read);
     if (num_written < 0) {
       CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to write file %s", OUTPUT_NAME);
-      goto print_and_exit;
+      goto close_and_exit;
     }
     if (num_written != num_read) {
       CALL_STDERR_PRINTLN("Partial written %6d bytes, expected %6d bytes", num_written, num_read);
-      goto print_and_exit;
+      goto close_and_exit;
     }
     last_read += num_read;
   }
@@ -422,35 +432,20 @@ nice_clean_up:
   CHECK_EXIT_CODE_AND_LEAVE();
 
 #ifndef __linux__
-  if (CALL_FLUSH(ofd) < 0) {
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to sync file (output) to disk %s", OUTPUT_NAME);
-    goto print_and_exit;
+  if (ofd != INVALID_HANDLE_VALUE && CALL_FLUSH(ofd) < 0) {
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to flush output file's buffer to disk %s", OUTPUT_NAME);
+    goto close_and_exit;
   }
 #endif
 
 close_and_exit:
-#ifdef _WIN32
-  if (!CloseHandle(ofd)) {
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close (sync) output file %s", OUTPUT_NAME);
-    CloseHandle(ifd); /* in reverse order */
-#else
-  if (close(ofd) < 0) {
-    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close (sync) output file %s", OUTPUT_NAME);
-    close(ifd); /* in reverse order */
-#endif
-    fflush(stdout);
-    // we should do it silently just like usage()
-    _exit(255);
-    return -1;
+  if (ofd != INVALID_HANDLE_VALUE && CALL_CLOSE(ofd) < 0) {
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close output file %s", OUTPUT_NAME);
   }
-#ifdef _WIN32
-  CloseHandle(ifd);
-#else
-  close(ifd);
-#endif
-  goto print_and_exit;
+  if (ifd != INVALID_HANDLE_VALUE && CALL_CLOSE(ifd) < 0) {
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to close input file %s", INPUT_NAME);
+  }
 
-print_and_exit:
   if (last_read == TOTAL_SIZE) {
     CALL_STDOUT_PRINTLN("Successfully written %3.4lf TiB", (double)TOTAL_SIZE/T);
   } else {
