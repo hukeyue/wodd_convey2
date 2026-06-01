@@ -180,13 +180,14 @@ typedef ULONGLONG loff_t; /* Same with QuadPart under LARGE_INTEGER */
 #define OUTPUT_NAME "/dev/null"
 #endif
 
-#define K             (1ull << 10)
-#define M             (1ull << 20)
-#define G             (1ull << 30)
-#define T             (1ull << 40)
-#define OFFSET        (12ull * T)
-#define TOTAL_SIZE    (16ull * T)
-#define SLICE         (8ul * M)
+#define K               (1ull << 10)
+#define M               (1ull << 20)
+#define G               (1ull << 30)
+#define T               (1ull << 40)
+#define OFFSET          (12ull * T)
+#define TOTAL_SIZE      (16ull * T)
+#define SLICE           (8ul * M)
+#define SLICE_ALIGNMENT (4ul * K)
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #define likely(x)     (x)
@@ -300,7 +301,7 @@ int main(int argc, const char* argv[]) {
 #else
   const char* const prog_name = argv[0];
 #endif
-  void* p_buffer;
+  void* p_buffer = NULL;
 #ifdef _WIN32
   HANDLE ifd = INVALID_HANDLE_VALUE, ofd = INVALID_HANDLE_VALUE;
 #else
@@ -366,11 +367,20 @@ int main(int argc, const char* argv[]) {
   CHECK_EXIT_CODE_AND_LEAVE();
 
   /* Allocate the slice buffer (quite large) */
-  p_buffer = malloc(SLICE + /* 0 + */ sizeof(int) * 5 + 3 * sizeof(short));
+#ifdef _WIN32
+  p_buffer = _aligned_malloc(SLICE, SLICE_ALIGNMENT);
   if (!p_buffer) {
-    usage(prog_name);
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to allocate memory");
     goto close_and_exit;
   }
+#else
+  int ret = posix_memalign(&p_buffer, SLICE_ALIGNMENT, SLICE);
+  if (ret != 0) {
+    CALL_STDERR_PRINTLN_WITH_ERRORS("Failed to allocate memory");
+    goto close_and_exit;
+  }
+  assert(p_buffer != NULL);
+#endif
   for (int i = 0; i < SLICE / sizeof(int32_t); ++i) {
     int32_t r = odd_random();
     memcpy(p_buffer + sizeof(r) * i, &r, sizeof(r));
@@ -426,7 +436,13 @@ flush_and_exit:
 nice_clean_up:
 
   /* Free the slice buffer (appended to freelist) */
-  free(p_buffer);
+  if (p_buffer) {
+#ifdef _WIN32
+    _aligned_free(p_buffer);
+#else
+    free(p_buffer);
+#endif
+  }
 
   /* check point 7: flush output stream */
   CHECK_EXIT_CODE_AND_LEAVE();
