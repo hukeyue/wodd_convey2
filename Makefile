@@ -17,8 +17,9 @@ CXX_OBJ_FILES := $(CXX_SRC_FILES:.cc=)
 CXX_OBJ32_FILES := $(CXX_SRC_FILES:.cc=32)
 CXX_OBJ64_FILES := $(CXX_SRC_FILES:.cc=64)
 
-CFLAGS := -UNDEBUG -D_FORTIFY_SOURCE=2 -std=c99
-CXXFLAGS :=  -UNDEBUG -D_FORTIFY_SOURCE=2 -std=c++20
+CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=2
+CFLAGS := $(CPPFLAGS) -gdwarf-4 -g2 -std=c99
+CXXFLAGS := $(CPPFLAGS) -gdwarf-4 -g2 -std=c++20
 TARGET ?= native
 ifneq ($(findstring win32,$(TARGET)),)
 	CFLAGS += -municode

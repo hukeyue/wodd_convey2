@@ -120,6 +120,24 @@ if (MSVC)
   else()
     add_link_options(/DEBUG)
   endif()
+else()
+  # clang defaults to DWARF2 on macOS unless mac_deployment_target is
+  # at least 10.11.
+  add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-gdwarf-4>)
+
+  add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-g2>)
+
+  # generate a complete set of debugging symbols for your code.
+  # The linker uses this extra debugging information to dead strip the executable.
+  if (APPLE)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-gfull>)
+  endif()
+
+  # gcc generates dwarf-aranges by default on -g1 and -g2. On clang it has
+  # to be manually enabled
+  if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-gdwarf-aranges>)
+  endif()
 endif()
 
 if (MINGW)
